@@ -1,14 +1,42 @@
 #pragma once
 
-// quality_from(...) staleness/quality helper, lifted from ezo's signal_quality (G5).
-//
-// Placeholder: this header is part of the public SDK API surface reserved by the
-// Wave-5 scaffold (anolis-protocol#52). The real declarations are lifted in the
-// device-model (D.2) and spine (D.3) steps of epic anolis-protocol#45. Kept now
-// so the include tree, namespace, and clang-tidy header scope are established.
+// Derive an ADPP `SignalValue.Quality` from a reading's availability and the
+// device's last-read freshness (G5). Lifted verbatim from ezo's
+// `signal_quality.hpp` (the most complete of the three) so the one quality rule
+// applies wherever a `SignalValue` is built. Depends only on the ADPP proto.
+
+#include <cstdint>
+
+#include "anolis/provider_sdk/result.hpp"  // adpp alias
+#include "protocol.pb.h"
 
 namespace anolis::provider_sdk {
 
-// (intentionally empty until the corresponding lift step)
+// Map a reading's flags + age onto an ADPP quality.
+//
+//   available       the adapter produced a usable sample slot for the signal
+//   has_value       the slot carries a concrete value
+//   last_read_ok    the device's most recent bus read succeeded
+//   age_ms          age of the sample (now - sampled_at), milliseconds
+//   stale_after_ms  staleness threshold, milliseconds
+//
+// Precondition: the caller has a sample for the signal; a missing sample is the
+// caller's `QUALITY_UNKNOWN` case.
+inline adpp::SignalValue::Quality quality_from(bool available, bool has_value, bool last_read_ok, std::int64_t age_ms,
+                                               std::int64_t stale_after_ms) {
+    if (!available) {
+        return adpp::SignalValue::QUALITY_UNKNOWN;
+    }
+    if (!last_read_ok) {
+        return adpp::SignalValue::QUALITY_FAULT;
+    }
+    if (age_ms > stale_after_ms) {
+        return adpp::SignalValue::QUALITY_STALE;
+    }
+    if (has_value) {
+        return adpp::SignalValue::QUALITY_OK;
+    }
+    return adpp::SignalValue::QUALITY_UNKNOWN;
+}
 
 }  // namespace anolis::provider_sdk
