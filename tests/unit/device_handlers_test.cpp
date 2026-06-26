@@ -260,3 +260,92 @@ TEST(DeviceHandlersTest, GetHealthIsDegradedWithAFailedDevice) {
     EXPECT_EQ(resp.get_health().provider().state(), adpp::ProviderHealth::STATE_DEGRADED);
     EXPECT_EQ(resp.get_health().devices_size(), 2);  // temp OK + flaky FAULT
 }
+
+// SDK#9: a mock that enriches per-device health for every id (live AND failed).
+namespace {
+struct EnrichMock : DeviceMock {
+    sdk::DeviceHealthExtra device_health(const std::string& id) const override {
+        sdk::DeviceHealthExtra e;
+        e.metrics["impl"] = "mock";
+        e.metrics["addr"] = id;  // per-device so we can tell entries apart
+        google::protobuf::Timestamp ts;
+        ts.set_seconds(1700000000);
+        e.last_seen = ts;
+        return e;
+    }
+};
+}  // namespace
+
+TEST(DeviceHandlersTest, DeviceHealthEnrichmentMergesMetricsAndLastSeen) {
+    EnrichMock rt;
+    adpp::ListDevicesRequest req;
+    req.set_include_health(true);
+    adpp::Response resp;
+    sdk::handlers::handle_list_devices(req, resp, rt);
+    ASSERT_EQ(resp.list_devices().device_health_size(), 1);
+    const auto& dh = resp.list_devices().device_health(0);
+    EXPECT_EQ(dh.device_id(), "temp");
+    ASSERT_TRUE(dh.metrics().contains("impl"));
+    EXPECT_EQ(dh.metrics().at("impl"), "mock");
+    EXPECT_EQ(dh.metrics().at("addr"), "temp");
+    EXPECT_TRUE(dh.has_last_seen());
+    EXPECT_EQ(dh.last_seen().seconds(), 1700000000);
+}
+
+TEST(DeviceHandlersTest, DeviceHealthNoOverrideLeavesWireUnchanged) {
+    // A provider that does NOT override device_health (the default) must emit no
+    // metrics and an unset last_seen — exact pre-SDK#9 wire output (backward-compat).
+    DeviceMock rt;
+    adpp::ListDevicesRequest req;
+    req.set_include_health(true);
+    adpp::Response resp;
+    sdk::handlers::handle_list_devices(req, resp, rt);
+    ASSERT_EQ(resp.list_devices().device_health_size(), 1);
+    const auto& dh = resp.list_devices().device_health(0);
+    EXPECT_EQ(dh.metrics_size(), 0);
+    EXPECT_FALSE(dh.has_last_seen());
+}
+
+TEST(DeviceHandlersTest, DeviceHealthEmptyExtraDoesNotMaterializeFields) {
+    // An override that returns an empty struct must be indistinguishable on the
+    // wire from no override — the presence guards must not materialize metrics
+    // (field 5) or stamp an epoch-0 last_seen (field 4).
+    struct EmptyExtraMock : DeviceMock {
+        sdk::DeviceHealthExtra device_health(const std::string&) const override { return {}; }
+    } rt;
+    adpp::ListDevicesRequest req;
+    req.set_include_health(true);
+    adpp::Response resp;
+    sdk::handlers::handle_list_devices(req, resp, rt);
+    ASSERT_EQ(resp.list_devices().device_health_size(), 1);
+    const auto& dh = resp.list_devices().device_health(0);
+    EXPECT_EQ(dh.metrics_size(), 0);
+    EXPECT_FALSE(dh.has_last_seen());
+}
+
+TEST(DeviceHandlersTest, DeviceHealthEnrichmentReachesFailedDeviceOnGetHealthOnly) {
+    // The enrichment hook fires for the failed/missing "flaky" id on get_health
+    // (live ∪ failed), but "flaky" must NOT appear on list_devices(include_health)
+    // (the conformance MUST: health ⊆ live devices). Asymmetry is protocol-mandated.
+    EnrichMock rt;
+
+    adpp::GetHealthRequest gh_req;
+    adpp::Response gh_resp;
+    sdk::handlers::handle_get_health(gh_req, gh_resp, rt);
+    ASSERT_EQ(gh_resp.get_health().devices_size(), 2);  // temp (live) + flaky (failed)
+    std::set<std::string> enriched;
+    for (const auto& dh : gh_resp.get_health().devices()) {
+        ASSERT_TRUE(dh.metrics().contains("addr")) << dh.device_id();
+        EXPECT_EQ(dh.metrics().at("addr"), dh.device_id());
+        EXPECT_TRUE(dh.has_last_seen());
+        enriched.insert(dh.device_id());
+    }
+    EXPECT_EQ(enriched, (std::set<std::string>{"temp", "flaky"}));
+
+    adpp::ListDevicesRequest ld_req;
+    ld_req.set_include_health(true);
+    adpp::Response ld_resp;
+    sdk::handlers::handle_list_devices(ld_req, ld_resp, rt);
+    ASSERT_EQ(ld_resp.list_devices().device_health_size(), 1);  // live "temp" only
+    EXPECT_EQ(ld_resp.list_devices().device_health(0).device_id(), "temp");
+}
