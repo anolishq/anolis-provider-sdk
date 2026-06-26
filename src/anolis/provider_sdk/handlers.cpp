@@ -188,7 +188,10 @@ void apply_min_timestamp(const adpp::ReadSignalsRequest& request, adpp::ReadSign
         const auto& ts = value.timestamp();
         const bool older =
             ts.seconds() < min_ts.seconds() || (ts.seconds() == min_ts.seconds() && ts.nanos() < min_ts.nanos());
-        if (older) {
+        // An unmet freshness hint only downgrades a currently-OK value to STALE; it
+        // must NOT mask a FAULT/UNKNOWN/UNSPECIFIED value (STALE understates "broken"
+        // as "usable but old"). #10.
+        if (older && value.quality() == adpp::SignalValue::QUALITY_OK) {
             value.set_quality(adpp::SignalValue::QUALITY_STALE);
         }
     }

@@ -190,6 +190,23 @@ TEST(DeviceHandlersTest, ApplyMinTimestampFlagsStaleValues) {
     EXPECT_EQ(fresh.values(0).quality(), adpp::SignalValue::QUALITY_OK);
 }
 
+TEST(DeviceHandlersTest, ApplyMinTimestampDoesNotMaskFaultOrUnknown) {
+    // #10: an unmet freshness hint must not downgrade FAULT/UNKNOWN to STALE — STALE
+    // ("usable but old") would understate a broken/unavailable value.
+    adpp::ReadSignalsRequest req;
+    req.mutable_min_timestamp()->set_seconds(2000);  // require fresher than the values
+
+    for (const auto quality : {adpp::SignalValue::QUALITY_FAULT, adpp::SignalValue::QUALITY_UNKNOWN,
+                               adpp::SignalValue::QUALITY_UNSPECIFIED}) {
+        adpp::ReadSignalsResponse out;
+        auto* v = out.add_values();
+        v->mutable_timestamp()->set_seconds(1000);  // old -> would be flagged if OK
+        v->set_quality(quality);
+        sdk::handlers::apply_min_timestamp(req, out);
+        EXPECT_EQ(out.values(0).quality(), quality) << "quality " << quality << " must survive the freshness gate";
+    }
+}
+
 TEST(DeviceHandlersTest, CallPolicyAndAcceptedShim) {
     DeviceMock rt;
 
