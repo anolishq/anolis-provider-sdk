@@ -131,6 +131,8 @@ add_library(anolis_provider_sdk STATIC
     src/anolis/provider_sdk/version.cpp
     src/anolis/provider_sdk/transport.cpp
     src/anolis/provider_sdk/logging.cpp
+    src/anolis/provider_sdk/handlers.cpp
+    src/anolis/provider_sdk/runtime.cpp
 )
 add_library(anolis::provider_sdk ALIAS anolis_provider_sdk)
 

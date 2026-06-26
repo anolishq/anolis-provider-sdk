@@ -1,14 +1,29 @@
 #pragma once
 
-// Shared handle_* request-dispatch handler skeleton over the neutral result interface (spine).
+// Generic ADPP request handlers (spine). Each fills a Response from the request
+// and the ProviderRuntime seam; run_loop dispatches to them. The ADPP policy
+// (§3.2 protocol gate here, §7.2/7.3/7.4 in the D.3c read/call handlers) lives in
+// the SDK so every provider gets it identically.
 //
-// Placeholder: this header is part of the public SDK API surface reserved by the
-// Wave-5 scaffold (anolis-protocol#52). The real declarations are lifted in the
-// device-model (D.2) and spine (D.3) steps of epic anolis-protocol#45. Kept now
-// so the include tree, namespace, and clang-tidy header scope are established.
+// D.3b implements the handshake/lifecycle handlers below; the device-model-coupled
+// handlers (list_devices/describe_device/read_signals/call/get_health) land in D.3c
+// (run_loop routes them to handle_unimplemented until then).
 
-namespace anolis::provider_sdk {
+#include <string>
 
-// (intentionally empty until the corresponding lift step)
+#include "anolis/provider_sdk/result.hpp"  // adpp alias
+#include "anolis/provider_sdk/runtime.hpp"
+#include "protocol.pb.h"
 
-}  // namespace anolis::provider_sdk
+namespace anolis::provider_sdk::handlers {
+
+// Handshake: validate the protocol version and advertise provider metadata.
+void handle_hello(const adpp::HelloRequest& request, adpp::Response& response, const ProviderRuntime& runtime);
+
+// Project the readiness/startup report into wait_ready diagnostics.
+void handle_wait_ready(const adpp::WaitReadyRequest& request, adpp::Response& response, const ProviderRuntime& runtime);
+
+// Standard UNIMPLEMENTED status for unsupported operations.
+void handle_unimplemented(adpp::Response& response, const std::string& message = "operation not implemented");
+
+}  // namespace anolis::provider_sdk::handlers
