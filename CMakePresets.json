@@ -1,0 +1,193 @@
+{
+  "version": 2,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 20,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "ANOLIS_PROVIDER_SDK_WARNINGS_AS_ERRORS": "OFF"
+      }
+    },
+    {
+      "name": "base-windows-msvc",
+      "hidden": true,
+      "inherits": "base",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "x64-windows",
+        "VCPKG_HOST_TRIPLET": "x64-windows"
+      }
+    },
+    {
+      "name": "dev-debug",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "dev-release",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "dev-windows-debug",
+      "inherits": "base-windows-msvc",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "dev-windows-release",
+      "inherits": "base-windows-msvc",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "ci-linux-release",
+      "inherits": "dev-release",
+      "cacheVariables": {
+        "ANOLIS_PROVIDER_SDK_WARNINGS_AS_ERRORS": "ON",
+        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/triplets",
+        "VCPKG_TARGET_TRIPLET": "x64-linux-static"
+      }
+    },
+    {
+      "name": "ci-tsan",
+      "inherits": "ci-linux-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "VCPKG_TARGET_TRIPLET": "x64-linux-tsan",
+        "ENABLE_TSAN": "ON",
+        "ANOLIS_PROVIDER_SDK_WARNINGS_AS_ERRORS": "OFF"
+      }
+    },
+    {
+      "name": "ci-linux-arm64-release",
+      "inherits": "dev-release",
+      "cacheVariables": {
+        "ANOLIS_PROVIDER_SDK_WARNINGS_AS_ERRORS": "ON",
+        "VCPKG_TARGET_TRIPLET": "arm64-linux"
+      }
+    },
+    {
+      "name": "ci-windows-release",
+      "inherits": "base-windows-msvc",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "ANOLIS_PROVIDER_SDK_WARNINGS_AS_ERRORS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev-debug",
+      "configurePreset": "dev-debug"
+    },
+    {
+      "name": "dev-release",
+      "configurePreset": "dev-release"
+    },
+    {
+      "name": "dev-windows-debug",
+      "configurePreset": "dev-windows-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "dev-windows-release",
+      "configurePreset": "dev-windows-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "ci-linux-release",
+      "configurePreset": "ci-linux-release"
+    },
+    {
+      "name": "ci-tsan",
+      "configurePreset": "ci-tsan"
+    },
+    {
+      "name": "ci-linux-arm64-release",
+      "configurePreset": "ci-linux-arm64-release"
+    },
+    {
+      "name": "ci-windows-release",
+      "configurePreset": "ci-windows-release",
+      "configuration": "Release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "dev-debug",
+      "configurePreset": "dev-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "dev-release",
+      "configurePreset": "dev-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "dev-windows-debug",
+      "configurePreset": "dev-windows-debug",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "dev-windows-release",
+      "configurePreset": "dev-windows-release",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "ci-linux-release",
+      "configurePreset": "ci-linux-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "ci-tsan",
+      "configurePreset": "ci-tsan",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "ci-linux-arm64-release",
+      "configurePreset": "ci-linux-arm64-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "ci-windows-release",
+      "configurePreset": "ci-windows-release",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

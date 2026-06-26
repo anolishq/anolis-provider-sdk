@@ -1,0 +1,18 @@
+# ThreadSanitizer suppressions for anolis-provider-sdk.
+#
+# Format: https://github.com/google/sanitizers/wiki/ThreadSanitizerSuppressions
+# Scope third-party / known-benign races ONLY. Never suppress first-party
+# (anolis::provider_sdk::) races — fix those. The TSAN lane runs with these
+# applied; the first run per change is a triage pass (read the tsan-report
+# artifact, then add a precise entry here for each confirmed false positive).
+
+# --- abseil (pulled in transitively by protobuf) -------------------------
+# abseil's internal synchronization primitives use intentional/benign races
+# on their own fast paths; these are well-documented upstream false positives.
+race:absl::base_internal::SpinLock
+race:absl::synchronization_internal::
+race:absl::base_internal::LowLevelAlloc
+
+# --- protobuf ------------------------------------------------------------
+# Lazy global/once initialization inside libprotobuf.
+race:google::protobuf::internal::

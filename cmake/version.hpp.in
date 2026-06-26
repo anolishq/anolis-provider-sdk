@@ -1,0 +1,15 @@
+#pragma once
+
+// Generated from cmake/version.hpp.in by CMake configure_file — do not edit.
+// The SDK version is the single source of truth in CMakeLists.txt project(VERSION).
+
+namespace anolis::provider_sdk {
+
+// Compile-time SDK version string ("MAJOR.MINOR.PATCH").
+inline constexpr const char* kVersion = "@PROJECT_VERSION@";
+
+// Runtime accessor (defined in src/version.cpp) — gives the static library a
+// real linkable symbol and lets consumers/tests verify the version wiring.
+const char* runtime_version() noexcept;
+
+}  // namespace anolis::provider_sdk

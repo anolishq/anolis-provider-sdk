@@ -1,0 +1,86 @@
+name: Hardening
+
+# Memory-safety / data-race hardening for the SDK.
+#   - tsan: ThreadSanitizer over the unit tests. The SDK has little concurrency
+#           today; the lane is forward-looking for the spine's run-loop and the
+#           planned worker-thread i2c-serialization convergence. Deps are rebuilt
+#           with TSAN via the x64-linux-tsan triplet.
+# Fails only on a real (first-party) finding; third-party false positives are
+# scoped in tsan.supp (first run per change = triage pass).
+#
+# A Valgrind leak lane is intentionally omitted until the spine lands a runnable
+# binary/smoke target to point it at (valgrind.supp already ships for that day).
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+  workflow_dispatch:
+
+concurrency:
+  group: provider-sdk-hardening-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tsan:
+    name: ThreadSanitizer (Ubuntu 24.04)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build g++
+
+      - name: Setup vcpkg
+        uses: anolishq/.github/.github/actions/setup-vcpkg@b2d9b16b9accee0e58d37e7d05add68b6621961a # v2.2
+        with:
+          triplet: x64-linux-static
+
+      - name: Configure
+        run: cmake --preset ci-tsan
+
+      - name: Build
+        run: cmake --build --preset ci-tsan --parallel
+
+      - name: Run tests with TSAN
+        env:
+          TSAN_OPTIONS: "suppressions=${{ github.workspace }}/tsan.supp second_deadlock_stack=1 detect_deadlocks=1 history_size=7 log_path=${{ github.workspace }}/tsan-report"
+        run: |
+          set +e
+          set -o pipefail
+          export CTEST_PARALLEL_LEVEL=1
+          timeout 20m ctest --preset ci-tsan --timeout 300 -VV 2>&1 | tee tsan-output.log
+          EXIT_CODE=${PIPESTATUS[0]}
+
+          if ls tsan-report.* >/dev/null 2>&1; then
+            echo "::error::ThreadSanitizer reported data races (see tsan-logs artifact)"
+            exit 1
+          fi
+
+          exit $EXIT_CODE
+
+      - name: Upload TSAN logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tsan-logs-${{ github.run_number }}
+          path: |
+            tsan-report.*
+            tsan-output.log
+            build/ci-tsan/Testing/Temporary/LastTest.log
+          if-no-files-found: ignore
+          retention-days: 14
