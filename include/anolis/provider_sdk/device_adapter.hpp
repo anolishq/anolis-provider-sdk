@@ -23,9 +23,9 @@
 #include <string>
 #include <vector>
 
-#include "anolis/provider_sdk/device_spec.hpp"
-#include "anolis/provider_sdk/result.hpp"  // adpp alias, AdapterReadResult/AdapterCallResult, ValueMap
+#include "device_spec.hpp"  // same-dir siblings
 #include "protocol.pb.h"
+#include "result.hpp"  // adpp alias, AdapterReadResult/AdapterCallResult, ValueMap
 
 namespace anolis::provider_sdk {
 
