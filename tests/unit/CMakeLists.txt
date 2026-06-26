@@ -1,6 +1,8 @@
 add_executable(provider_sdk_unit_tests
     proto_smoke_test.cpp
     device_model_test.cpp
+    transport_test.cpp
+    logging_test.cpp
 )
 
 target_link_libraries(provider_sdk_unit_tests PRIVATE

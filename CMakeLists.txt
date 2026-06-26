@@ -129,6 +129,8 @@ configure_file(
 # source/FetchContent so TSAN/static/arm64 rebuild protobuf in-tree.
 add_library(anolis_provider_sdk STATIC
     src/anolis/provider_sdk/version.cpp
+    src/anolis/provider_sdk/transport.cpp
+    src/anolis/provider_sdk/logging.cpp
 )
 add_library(anolis::provider_sdk ALIAS anolis_provider_sdk)
 
