@@ -57,7 +57,7 @@ adpp::ProviderHealth make_provider_health(const ReadinessReport& report) {
 // channel), and inventory.proto requires list_devices(include_health) to carry a
 // health entry for every listed device.
 std::vector<adpp::DeviceHealth> make_device_health(const std::vector<std::string>& device_ids,
-                                                   const ReadinessReport& report) {
+                                                   const ReadinessReport& report, const ProviderRuntime& runtime) {
     std::unordered_map<std::string, const ReadinessReport::DeviceFailure*> failed;
     for (const auto& failure : report.failed_devices) {
         failed.emplace(failure.device_id, &failure);
@@ -77,6 +77,21 @@ std::vector<adpp::DeviceHealth> make_device_health(const std::vector<std::string
         } else {
             dh.set_state(adpp::DeviceHealth::STATE_OK);
             dh.set_message("ok");
+        }
+        // SDK#9: merge the provider's per-device enrichment (one call/device,
+        // covers live AND failed/missing ids). Presence guards keep wire output
+        // unchanged for non-overriding providers: an empty map never materializes
+        // the metrics field, and last_seen is set only when the optional is
+        // engaged (so devices aren't stamped with an epoch-0 "last seen 1970").
+        const DeviceHealthExtra extra = runtime.device_health(id);
+        if (!extra.metrics.empty()) {
+            auto& dst = *dh.mutable_metrics();
+            for (const auto& [key, value] : extra.metrics) {
+                dst[key] = value;
+            }
+        }
+        if (extra.last_seen) {
+            *dh.mutable_last_seen() = *extra.last_seen;
         }
         out.push_back(std::move(dh));
     }
@@ -140,7 +155,8 @@ void handle_list_devices(const adpp::ListDevicesRequest& request, adpp::Response
     if (request.include_health()) {
         // Cover exactly the listed devices (the harness rejects health for any
         // device not in the inventory, and requires one entry per listed device).
-        for (auto& health : make_device_health(device_ids, runtime.readiness())) {
+        // Per-device enrichment (SDK#9) is applied inside make_device_health.
+        for (auto& health : make_device_health(device_ids, runtime.readiness(), runtime)) {
             *out->add_device_health() = std::move(health);
         }
     }
@@ -277,7 +293,7 @@ void handle_get_health(const adpp::GetHealthRequest& /*request*/, adpp::Response
             ids.push_back(failure.device_id);
         }
     }
-    for (auto& health : make_device_health(ids, report)) {
+    for (auto& health : make_device_health(ids, report, runtime)) {
         *out->add_devices() = std::move(health);
     }
     set_status_ok(response);

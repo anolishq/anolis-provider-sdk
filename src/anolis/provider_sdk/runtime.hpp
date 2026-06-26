@@ -48,6 +48,16 @@ struct ReadinessReport {
     std::map<std::string, std::string> extra_diagnostics;  // provider-specific extras
 };
 
+// Per-device health enrichment a provider may supply (SDK#9). The SDK merges it
+// into each DeviceHealth it emits: `metrics` into DeviceHealth.metrics, and
+// `last_seen` into the structured DeviceHealth.last_seen field only when engaged.
+// Both members default to "absent" so a non-overriding provider's wire output is
+// unchanged (empty map => metrics untouched; nullopt => last_seen left unset).
+struct DeviceHealthExtra {
+    std::map<std::string, std::string> metrics;
+    std::optional<google::protobuf::Timestamp> last_seen;
+};
+
 // The seam the generic handlers + run_loop consume. The provider implements it;
 // read/call internally acquire the HandleT and dispatch through DeviceAdapter<HandleT>.
 class ProviderRuntime {
@@ -57,6 +67,15 @@ public:
     // Handshake / readiness / health.
     virtual ProviderMetadata metadata() const = 0;
     virtual ReadinessReport readiness() const = 0;
+
+    // Per-device health enrichment (SDK#9). Defaulted so existing providers need
+    // no change. Called once per device id the SDK surfaces in
+    // list_devices(include_health) and get_health — for BOTH live-inventory ids
+    // AND startup-failed/missing ids (which have no live handle, so an override
+    // MUST tolerate an unknown id and return a default-constructed value). MUST be
+    // in-process only (no live device I/O on this path) and SHOULD take at most one
+    // internal snapshot so the returned metrics + last_seen are one atomic view.
+    virtual DeviceHealthExtra device_health(const std::string& /*device_id*/) const { return {}; }
 
     // Inventory.
     virtual std::vector<std::string> list_device_ids() const = 0;
