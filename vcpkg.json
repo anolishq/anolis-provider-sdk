@@ -1,0 +1,9 @@
+{
+  "name": "anolis-provider-sdk",
+  "version": "0.1.0",
+  "description": "Shared C++ SDK for Anolis Device Provider Protocol (ADPP) device providers",
+  "dependencies": [
+    "gtest",
+    "protobuf"
+  ]
+}

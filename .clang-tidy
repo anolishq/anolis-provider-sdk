@@ -1,0 +1,22 @@
+---
+# Shared provider clang-tidy config (mirrors the anolis runtime).
+# High-value signal only: keep diagnostics/analyzer/bugprone/performance, drop readability noise.
+Checks: >
+  clang-diagnostic-*,
+  clang-analyzer-*,
+  performance-*,
+  bugprone-*,
+  -readability-*,
+  -bugprone-macro-parentheses,
+  -bugprone-easily-swappable-parameters,
+  -performance-enum-size
+# Note: consider re-enabling specific readability checks once bugprone/perf are clean.
+WarningsAsErrors: ""
+# Limit diagnostics to the SDK's own source roots. Unlike the provider servers
+# (which keep all code under src/), this is a LIBRARY: its public API surface —
+# the header-only DeviceAdapter<HandleT> framework — lives under include/, so
+# include/ is part of the lint scope. Generated protobuf sources live under
+# build/ and are excluded (clang-tidy is also disabled on the proto CMake target
+# so compile_commands does not drag them in).
+HeaderFilterRegex: ".*/(include|src|tests)/.*"
+FormatStyle: file

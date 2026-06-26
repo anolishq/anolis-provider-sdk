@@ -1,0 +1,89 @@
+name: Release
+
+# The SDK is consumed as SOURCE via FetchContent (never a prebuilt binary), so a
+# release publishes a source tarball + checksums + manifest that providers pin by
+# URL + SHA256 — mirroring how anolis-protocol ships. Builds + tests on the tag
+# first so a release never ships a tree that doesn't build.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release-source:
+    name: Release (source tarball)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout anolis-provider-sdk
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          path: anolis-provider-sdk
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++ jq
+
+      - name: Extract version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup vcpkg
+        uses: anolishq/.github/.github/actions/setup-vcpkg@b2d9b16b9accee0e58d37e7d05add68b6621961a # v2.2
+        with:
+          triplet: x64-linux-static
+
+      - name: Configure
+        working-directory: anolis-provider-sdk
+        run: cmake --preset ci-linux-release
+
+      - name: Build
+        working-directory: anolis-provider-sdk
+        run: cmake --build --preset ci-linux-release --parallel
+
+      - name: Test
+        working-directory: anolis-provider-sdk
+        run: ctest --preset ci-linux-release
+
+      - name: Package source tarball
+        working-directory: anolis-provider-sdk
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          git archive --format=tar.gz \
+            --prefix="anolis-provider-sdk-${VERSION}/" \
+            -o "anolis-provider-sdk-${VERSION}-source.tar.gz" \
+            HEAD
+
+      - name: Generate checksums
+        working-directory: anolis-provider-sdk
+        run: sha256sum anolis-provider-sdk-*.tar.gz > SHA256SUMS
+
+      - name: Generate manifest
+        working-directory: anolis-provider-sdk
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ASSET="anolis-provider-sdk-${VERSION}-source.tar.gz"
+          SHA=$(grep "${ASSET}" SHA256SUMS | awk '{print $1}')
+          jq -n \
+            --argjson schema_version 1 \
+            --arg repo "anolishq/anolis-provider-sdk" \
+            --arg component "anolis_provider_sdk" \
+            --arg version "${VERSION}" \
+            --arg platform "source" \
+            --arg asset "${ASSET}" \
+            --arg sha256 "${SHA}" \
+            '{schema_version: $schema_version, repo: $repo, component: $component, version: $version, platform: $platform, asset: $asset, sha256: $sha256}' \
+            > manifest.json
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
+        with:
+          files: |
+            anolis-provider-sdk/anolis-provider-sdk-*-source.tar.gz
+            anolis-provider-sdk/SHA256SUMS
+            anolis-provider-sdk/manifest.json
+          generate_release_notes: true

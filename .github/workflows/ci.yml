@@ -1,0 +1,177 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: provider-sdk-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+      cpp: ${{ steps.cppfilter.outputs.cpp }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4
+        id: filter
+        with:
+          predicate-quantifier: every
+          filters: |
+            code:
+              - '**'
+              - '!docs/**'
+              - '!**/*.md'
+              - '!**/*.png'
+              - '!**/*.svg'
+      # Separate OR-filter (default quantifier) for the C++ sources the clang-tidy
+      # gate lints, so it skips (and the ok gate stays green) on non-C++ PRs.
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4
+        id: cppfilter
+        with:
+          filters: |
+            cpp:
+              - '**/*.c'
+              - '**/*.cc'
+              - '**/*.cpp'
+              - '**/*.cxx'
+              - '**/*.h'
+              - '**/*.hh'
+              - '**/*.hpp'
+              - '**/*.hxx'
+              - '.clang-tidy'
+
+  build-and-test-linux:
+    name: Linux Build and Test
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout anolis-provider-sdk
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          path: anolis-provider-sdk
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++
+
+      - name: Setup vcpkg
+        uses: anolishq/.github/.github/actions/setup-vcpkg@b2d9b16b9accee0e58d37e7d05add68b6621961a # v2.2
+        with:
+          triplet: x64-linux-static
+
+      - name: Configure
+        working-directory: anolis-provider-sdk
+        run: cmake --preset ci-linux-release
+
+      - name: Build
+        working-directory: anolis-provider-sdk
+        run: cmake --build --preset ci-linux-release --parallel
+
+      - name: Test
+        working-directory: anolis-provider-sdk
+        run: ctest --preset ci-linux-release
+
+  build-and-test-windows:
+    name: Windows Build and Test
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout anolis-provider-sdk
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          path: anolis-provider-sdk
+
+      - name: Setup vcpkg
+        uses: anolishq/.github/.github/actions/setup-vcpkg@b2d9b16b9accee0e58d37e7d05add68b6621961a # v2.2
+        with:
+          triplet: x64-windows
+
+      - name: Configure
+        working-directory: anolis-provider-sdk
+        shell: pwsh
+        run: cmake --preset ci-windows-release
+
+      - name: Build
+        working-directory: anolis-provider-sdk
+        shell: pwsh
+        run: cmake --build --preset ci-windows-release --parallel
+
+      - name: Test
+        working-directory: anolis-provider-sdk
+        shell: pwsh
+        run: ctest --preset ci-windows-release
+
+  version-sync:
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
+    uses: anolishq/.github/.github/workflows/version-sync.yml@c76784aff711e6540d539f6a5c3ea33c63627930 # v2
+    with:
+      python-version: '3.12'
+      working-directory: '.'
+
+  cpp-format:
+    name: C++ Formatting (clang-format)
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout anolis-provider-sdk
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Install pinned clang-tools
+        # SHA-verified static LLVM 18.1.8 clang-format on PATH — the org source of
+        # truth, matching workstation-configs apps/clang-tools on dev boxes. See
+        # anolishq/.github#69.
+        uses: anolishq/.github/.github/actions/setup-clang-tools@9869a5f4bee7da9c7c1dc9bae033cd0137c4801d # setup-clang-tools
+      - name: Check formatting
+        run: git ls-files '*.c' '*.cc' '*.cpp' '*.cxx' '*.h' '*.hh' '*.hpp' '*.hxx' | xargs clang-format --dry-run --Werror
+
+  clang-tidy:
+    name: Clang-Tidy (changed lines)
+    needs: [changes]
+    if: needs.changes.outputs.cpp == 'true'
+    permissions:
+      contents: read
+    uses: anolishq/.github/.github/workflows/clang-tidy-diff.yml@9869a5f4bee7da9c7c1dc9bae033cd0137c4801d # clang-tidy-diff
+    with:
+      configure-preset: ci-linux-release
+      blocking: true
+
+  ok:
+    name: ok
+    if: always()
+    needs:
+      - changes
+      - build-and-test-linux
+      - build-and-test-windows
+      - cpp-format
+      - clang-tidy
+      - version-sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Evaluate job results
+        run: |
+          echo "Job results: ${{ toJSON(needs.*.result) }}"
+      - name: Fail if any required job failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1

@@ -1,0 +1,11 @@
+# Valgrind suppressions for anolis-provider-sdk.
+#
+# The shared valgrind-leak workflow runs with --gen-suppressions=all, so the
+# first run per change is a triage pass: download the valgrind-log artifact,
+# copy the generated suppression blocks for any CONFIRMED third-party false
+# positive (protobuf / abseil static init), and paste them here.
+# Never suppress a first-party "definitely lost" leak — fix it.
+#
+# (Intentionally empty until triage surfaces a real false positive. The SDK
+# ships this file now so the valgrind lane has a stable suppressions path once
+# a runnable smoke/unit binary exists to point it at — see hardening.yml.)
