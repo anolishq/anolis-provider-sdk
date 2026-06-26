@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -88,8 +89,12 @@ TEST(DeviceHandlersTest, ListDevicesWithAndWithoutHealth) {
     adpp::Response resp_h;
     req.set_include_health(true);
     sdk::handlers::handle_list_devices(req, resp_h, rt);
-    // one healthy (temp) + one failed (flaky) = 2 health entries
-    EXPECT_EQ(resp_h.list_devices().device_health_size(), 2);
+    // Health covers exactly the LISTED devices (one entry for the live "temp").
+    // The startup-failed "flaky" is NOT live, so it must NOT appear here — the
+    // harness rejects health for devices not in the inventory.
+    ASSERT_EQ(resp_h.list_devices().device_health_size(), 1);
+    EXPECT_EQ(resp_h.list_devices().device_health(0).device_id(), "temp");
+    EXPECT_EQ(resp_h.list_devices().device_health(0).state(), adpp::DeviceHealth::STATE_OK);
 }
 
 TEST(DeviceHandlersTest, DescribeDeviceValidatesAndReturnsCaps) {
@@ -224,6 +229,26 @@ TEST(DeviceHandlersTest, CallPolicyAndAcceptedShim) {
         sdk::handlers::handle_call(req, resp, rt);
         EXPECT_EQ(resp.status().code(), adpp::Status::CODE_OK);
     }
+}
+
+TEST(DeviceHandlersTest, LiveDeviceNotInStartupReportStillGetsHealth) {
+    // Regression (caught by sim conformance): a live device absent from the
+    // startup report — e.g. a synthetic control channel like sim's chaos_control —
+    // must still get a health entry. list_devices(include_health) MUST cover every
+    // listed device, and health must not reference unlisted devices.
+    struct LiveOnlyMock : DeviceMock {
+        std::vector<std::string> list_device_ids() const override { return {"temp", "control"}; }
+    } rt;  // readiness() (inherited) knows only "temp"; "control" is live-only
+    adpp::Response resp;
+    adpp::ListDevicesRequest req;
+    req.set_include_health(true);
+    sdk::handlers::handle_list_devices(req, resp, rt);
+
+    std::set<std::string> health_ids;
+    for (const auto& dh : resp.list_devices().device_health()) {
+        health_ids.insert(dh.device_id());
+    }
+    EXPECT_EQ(health_ids, (std::set<std::string>{"temp", "control"}));
 }
 
 TEST(DeviceHandlersTest, GetHealthIsDegradedWithAFailedDevice) {

@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -48,23 +49,35 @@ adpp::ProviderHealth make_provider_health(const ReadinessReport& report) {
     return health;
 }
 
-// Per-device health: OK for devices that initialized, FAULT (with the failure
-// reason) for those that did not.
-std::vector<adpp::DeviceHealth> make_device_health(const ReadinessReport& report) {
+// Per-device health for `device_ids`, cross-referenced with the readiness
+// snapshot: UNREACHABLE (with the failure reason) for ids that failed to
+// initialize, OK otherwise. The caller passes the device set to cover — the LIVE
+// inventory, not just the startup report — because a provider can expose live
+// devices that were never in the startup report (e.g. a synthetic control
+// channel), and inventory.proto requires list_devices(include_health) to carry a
+// health entry for every listed device.
+std::vector<adpp::DeviceHealth> make_device_health(const std::vector<std::string>& device_ids,
+                                                   const ReadinessReport& report) {
+    std::unordered_map<std::string, const ReadinessReport::DeviceFailure*> failed;
+    for (const auto& failure : report.failed_devices) {
+        failed.emplace(failure.device_id, &failure);
+    }
     std::vector<adpp::DeviceHealth> out;
-    out.reserve(report.successful_device_ids.size() + report.failed_devices.size());
-    for (const auto& id : report.successful_device_ids) {
+    out.reserve(device_ids.size());
+    for (const auto& id : device_ids) {
         adpp::DeviceHealth dh;
         dh.set_device_id(id);
-        dh.set_state(adpp::DeviceHealth::STATE_OK);
-        dh.set_message("ok");
-        out.push_back(std::move(dh));
-    }
-    for (const auto& failure : report.failed_devices) {
-        adpp::DeviceHealth dh;
-        dh.set_device_id(failure.device_id);
-        dh.set_state(adpp::DeviceHealth::STATE_FAULT);
-        dh.set_message(failure.reason);
+        const auto it = failed.find(id);
+        if (it != failed.end()) {
+            // A device that failed to initialize couldn't be brought up/reached —
+            // UNREACHABLE is the accurate state (FAULT is for a device that came up
+            // but reported an internal fault).
+            dh.set_state(adpp::DeviceHealth::STATE_UNREACHABLE);
+            dh.set_message(it->second->reason);
+        } else {
+            dh.set_state(adpp::DeviceHealth::STATE_OK);
+            dh.set_message("ok");
+        }
         out.push_back(std::move(dh));
     }
     return out;
@@ -120,11 +133,14 @@ void handle_wait_ready(const adpp::WaitReadyRequest& /*request*/, adpp::Response
 void handle_list_devices(const adpp::ListDevicesRequest& request, adpp::Response& response,
                          const ProviderRuntime& runtime) {
     auto* out = response.mutable_list_devices();
-    for (const auto& id : runtime.list_device_ids()) {
+    const auto device_ids = runtime.list_device_ids();
+    for (const auto& id : device_ids) {
         *out->add_devices() = runtime.device_info(id);
     }
     if (request.include_health()) {
-        for (auto& health : make_device_health(runtime.readiness())) {
+        // Cover exactly the listed devices (the harness rejects health for any
+        // device not in the inventory, and requires one entry per listed device).
+        for (auto& health : make_device_health(device_ids, runtime.readiness())) {
             *out->add_device_health() = std::move(health);
         }
     }
@@ -251,7 +267,17 @@ void handle_get_health(const adpp::GetHealthRequest& /*request*/, adpp::Response
     const ReadinessReport report = runtime.readiness();
     auto* out = response.mutable_get_health();
     *out->mutable_provider() = make_provider_health(report);
-    for (auto& health : make_device_health(report)) {
+
+    // Health for the live inventory, plus any startup-failed devices that are no
+    // longer live (so get_health still surfaces a device that failed to init).
+    std::vector<std::string> ids = runtime.list_device_ids();
+    std::unordered_set<std::string> live(ids.begin(), ids.end());
+    for (const auto& failure : report.failed_devices) {
+        if (live.find(failure.device_id) == live.end()) {
+            ids.push_back(failure.device_id);
+        }
+    }
+    for (auto& health : make_device_health(ids, report)) {
         *out->add_devices() = std::move(health);
     }
     set_status_ok(response);
