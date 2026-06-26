@@ -1,0 +1,237 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <vector>
+
+#include "anolis/provider_sdk/handlers.hpp"
+#include "anolis/provider_sdk/runtime.hpp"
+#include "anolis/provider_sdk/values.hpp"
+#include "protocol.pb.h"
+
+// D.3c device-model handler tests: list/describe/read/call/get_health policy
+// (§7.2 default-set passthrough, §7.4 unknown-signal NOT_FOUND, §7.3 staleness,
+// §6.2 function resolution, the `accepted` call shim) via a richer mock runtime.
+
+namespace sdk = anolis::provider_sdk;
+namespace adpp = anolis::deviceprovider::v1;
+
+namespace {
+
+class DeviceMock : public sdk::ProviderRuntime {
+public:
+    bool read_ok = true;
+
+    sdk::ProviderMetadata metadata() const override { return {"mock", "1.0.0", "v1", {}}; }
+    sdk::ReadinessReport readiness() const override {
+        sdk::ReadinessReport r;
+        r.configured_device_count = 2;
+        r.successful_device_ids = {"temp"};
+        r.failed_devices = {{"flaky", "kind", "init timeout"}};
+        r.provider_impl = "mock";
+        r.startup_policy = "degraded";
+        return r;
+    }
+    std::vector<std::string> list_device_ids() const override { return {"temp"}; }
+    bool has_device(const std::string& id) const override { return id == "temp"; }
+    adpp::Device device_info(const std::string& id) const override {
+        adpp::Device d;
+        d.set_device_id(id);
+        return d;
+    }
+    adpp::CapabilitySet capabilities(const std::string&) const override {
+        adpp::CapabilitySet caps;
+        caps.add_signals()->set_signal_id("temp_c");
+        caps.add_signals()->set_signal_id("temp_f");
+        return caps;
+    }
+    sdk::AdapterReadResult read(const std::string&, const std::vector<std::string>& ids) override {
+        sdk::AdapterReadResult r;
+        if (!read_ok) {
+            r.ok = false;
+            r.error_code = adpp::Status::CODE_UNAVAILABLE;
+            r.error_message = "bus down";
+            return r;
+        }
+        r.ok = true;
+        r.error_code = adpp::Status::CODE_OK;
+        const std::vector<std::string> to_emit = ids.empty() ? std::vector<std::string>{"temp_c"} : ids;
+        for (const auto& id : to_emit) {
+            r.values.push_back(sdk::make_signal_value(id, sdk::make_double_val(21.0)));
+        }
+        return r;
+    }
+    sdk::AdapterCallResult call(const std::string&, uint32_t function_id, const sdk::ValueMap&) override {
+        if (function_id != 1) {
+            return sdk::call_not_found("no such function_id");
+        }
+        return sdk::call_ok();
+    }
+    std::optional<uint32_t> resolve_function_id(const std::string&, const std::string& name) const override {
+        if (name == "set_target") return 1u;
+        return std::nullopt;
+    }
+};
+
+}  // namespace
+
+TEST(DeviceHandlersTest, ListDevicesWithAndWithoutHealth) {
+    DeviceMock rt;
+    adpp::Response resp;
+    adpp::ListDevicesRequest req;
+    sdk::handlers::handle_list_devices(req, resp, rt);
+    EXPECT_EQ(resp.status().code(), adpp::Status::CODE_OK);
+    ASSERT_EQ(resp.list_devices().devices_size(), 1);
+    EXPECT_EQ(resp.list_devices().device_health_size(), 0);
+
+    adpp::Response resp_h;
+    req.set_include_health(true);
+    sdk::handlers::handle_list_devices(req, resp_h, rt);
+    // one healthy (temp) + one failed (flaky) = 2 health entries
+    EXPECT_EQ(resp_h.list_devices().device_health_size(), 2);
+}
+
+TEST(DeviceHandlersTest, DescribeDeviceValidatesAndReturnsCaps) {
+    DeviceMock rt;
+    adpp::Response empty_resp;
+    adpp::DescribeDeviceRequest empty;
+    sdk::handlers::handle_describe_device(empty, empty_resp, rt);
+    EXPECT_EQ(empty_resp.status().code(), adpp::Status::CODE_INVALID_ARGUMENT);
+
+    adpp::Response nf_resp;
+    adpp::DescribeDeviceRequest nf;
+    nf.set_device_id("ghost");
+    sdk::handlers::handle_describe_device(nf, nf_resp, rt);
+    EXPECT_EQ(nf_resp.status().code(), adpp::Status::CODE_NOT_FOUND);
+
+    adpp::Response ok_resp;
+    adpp::DescribeDeviceRequest ok;
+    ok.set_device_id("temp");
+    sdk::handlers::handle_describe_device(ok, ok_resp, rt);
+    EXPECT_EQ(ok_resp.status().code(), adpp::Status::CODE_OK);
+    EXPECT_EQ(ok_resp.describe_device().device().device_id(), "temp");
+    EXPECT_EQ(ok_resp.describe_device().capabilities().signals_size(), 2);
+}
+
+TEST(DeviceHandlersTest, ReadSignalsPolicy) {
+    DeviceMock rt;
+
+    // empty device_id -> INVALID_ARGUMENT
+    {
+        adpp::Response resp;
+        adpp::ReadSignalsRequest req;
+        sdk::handlers::handle_read_signals(req, resp, rt);
+        EXPECT_EQ(resp.status().code(), adpp::Status::CODE_INVALID_ARGUMENT);
+    }
+    // unknown device -> NOT_FOUND
+    {
+        adpp::Response resp;
+        adpp::ReadSignalsRequest req;
+        req.set_device_id("ghost");
+        sdk::handlers::handle_read_signals(req, resp, rt);
+        EXPECT_EQ(resp.status().code(), adpp::Status::CODE_NOT_FOUND);
+    }
+    // unknown signal_id -> NOT_FOUND for the whole read (§7.4)
+    {
+        adpp::Response resp;
+        adpp::ReadSignalsRequest req;
+        req.set_device_id("temp");
+        req.add_signal_ids("temp_c");
+        req.add_signal_ids("bogus");
+        sdk::handlers::handle_read_signals(req, resp, rt);
+        EXPECT_EQ(resp.status().code(), adpp::Status::CODE_NOT_FOUND);
+    }
+    // empty signal_ids -> default set (§7.2)
+    {
+        adpp::Response resp;
+        adpp::ReadSignalsRequest req;
+        req.set_device_id("temp");
+        sdk::handlers::handle_read_signals(req, resp, rt);
+        EXPECT_EQ(resp.status().code(), adpp::Status::CODE_OK);
+        ASSERT_EQ(resp.read_signals().values_size(), 1);
+        EXPECT_EQ(resp.read_signals().values(0).signal_id(), "temp_c");
+    }
+    // adapter read failure maps the neutral error through
+    {
+        rt.read_ok = false;
+        adpp::Response resp;
+        adpp::ReadSignalsRequest req;
+        req.set_device_id("temp");
+        sdk::handlers::handle_read_signals(req, resp, rt);
+        EXPECT_EQ(resp.status().code(), adpp::Status::CODE_UNAVAILABLE);
+        EXPECT_EQ(resp.status().message(), "bus down");
+    }
+}
+
+TEST(DeviceHandlersTest, ApplyMinTimestampFlagsStaleValues) {
+    adpp::ReadSignalsResponse out;
+    auto* v = out.add_values();
+    v->set_signal_id("temp_c");
+    v->mutable_timestamp()->set_seconds(1000);  // old
+    v->set_quality(adpp::SignalValue::QUALITY_OK);
+
+    adpp::ReadSignalsRequest req;
+    req.mutable_min_timestamp()->set_seconds(2000);  // require fresher than the value
+    sdk::handlers::apply_min_timestamp(req, out);
+    EXPECT_EQ(out.values(0).quality(), adpp::SignalValue::QUALITY_STALE);
+
+    // a value at/after min_timestamp is left untouched
+    adpp::ReadSignalsResponse fresh;
+    auto* fv = fresh.add_values();
+    fv->mutable_timestamp()->set_seconds(3000);
+    fv->set_quality(adpp::SignalValue::QUALITY_OK);
+    sdk::handlers::apply_min_timestamp(req, fresh);
+    EXPECT_EQ(fresh.values(0).quality(), adpp::SignalValue::QUALITY_OK);
+}
+
+TEST(DeviceHandlersTest, CallPolicyAndAcceptedShim) {
+    DeviceMock rt;
+
+    // missing function -> INVALID_ARGUMENT
+    {
+        adpp::Response resp;
+        adpp::CallRequest req;
+        req.set_device_id("temp");
+        sdk::handlers::handle_call(req, resp, rt);
+        EXPECT_EQ(resp.status().code(), adpp::Status::CODE_INVALID_ARGUMENT);
+    }
+    // unknown function_name -> NOT_FOUND
+    {
+        adpp::Response resp;
+        adpp::CallRequest req;
+        req.set_device_id("temp");
+        req.set_function_name("nope");
+        sdk::handlers::handle_call(req, resp, rt);
+        EXPECT_EQ(resp.status().code(), adpp::Status::CODE_NOT_FOUND);
+    }
+    // resolve by name -> ok + accepted shim
+    {
+        adpp::Response resp;
+        adpp::CallRequest req;
+        req.set_device_id("temp");
+        req.set_function_name("set_target");
+        sdk::handlers::handle_call(req, resp, rt);
+        EXPECT_EQ(resp.status().code(), adpp::Status::CODE_OK);
+        EXPECT_TRUE(resp.call().results().at("accepted").bool_value());
+    }
+    // by function_id directly -> ok
+    {
+        adpp::Response resp;
+        adpp::CallRequest req;
+        req.set_device_id("temp");
+        req.set_function_id(1);
+        sdk::handlers::handle_call(req, resp, rt);
+        EXPECT_EQ(resp.status().code(), adpp::Status::CODE_OK);
+    }
+}
+
+TEST(DeviceHandlersTest, GetHealthIsDegradedWithAFailedDevice) {
+    DeviceMock rt;
+    adpp::Response resp;
+    adpp::GetHealthRequest req;
+    sdk::handlers::handle_get_health(req, resp, rt);
+    EXPECT_EQ(resp.status().code(), adpp::Status::CODE_OK);
+    EXPECT_EQ(resp.get_health().provider().state(), adpp::ProviderHealth::STATE_DEGRADED);
+    EXPECT_EQ(resp.get_health().devices_size(), 2);  // temp OK + flaky FAULT
+}

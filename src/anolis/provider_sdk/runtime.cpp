@@ -64,8 +64,17 @@ int run_loop(std::istream& input, std::ostream& output, ProviderRuntime& runtime
         } else if (request.has_wait_ready()) {
             handlers::handle_wait_ready(request.wait_ready(), response, runtime);
             hooks.on_wait_ready();
+        } else if (request.has_list_devices()) {
+            handlers::handle_list_devices(request.list_devices(), response, runtime);
+        } else if (request.has_describe_device()) {
+            handlers::handle_describe_device(request.describe_device(), response, runtime);
+        } else if (request.has_read_signals()) {
+            handlers::handle_read_signals(request.read_signals(), response, runtime);
+        } else if (request.has_call()) {
+            handlers::handle_call(request.call(), response, runtime);
+        } else if (request.has_get_health()) {
+            handlers::handle_get_health(request.get_health(), response, runtime);
         } else {
-            // D.3c fills list_devices / describe_device / read_signals / call / get_health.
             handlers::handle_unimplemented(response);
         }
 

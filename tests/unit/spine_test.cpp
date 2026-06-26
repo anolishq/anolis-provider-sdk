@@ -162,15 +162,14 @@ TEST(SpineTest, WaitReadyAfterHelloProjectsDiagnosticsAndFiresHook) {
     EXPECT_EQ(wr_resp.wait_ready().diagnostics().at("startup_degraded"), "false");
 }
 
-TEST(SpineTest, UnimplementedRequestTypesReturnUnimplementedAfterHello) {
+TEST(SpineTest, UnrecognizedRequestFallsThroughToUnimplemented) {
     MockRuntime rt;
     std::stringstream in(std::ios::in | std::ios::out | std::ios::binary);
     std::stringstream out(std::ios::in | std::ios::out | std::ios::binary);
     push_request(in, hello_request());
-    adpp::Request read;
-    read.set_request_id(3);
-    read.mutable_read_signals()->set_device_id("dev0");  // D.3c handler not wired yet
-    push_request(in, read);
+    adpp::Request empty;  // no request oneof set -> dispatch fall-through
+    empty.set_request_id(3);
+    push_request(in, empty);
 
     EXPECT_EQ(sdk::run_loop(in, out, rt), 0);
     const auto responses = drain_responses(out);

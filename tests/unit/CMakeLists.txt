@@ -4,6 +4,7 @@ add_executable(provider_sdk_unit_tests
     transport_test.cpp
     logging_test.cpp
     spine_test.cpp
+    device_handlers_test.cpp
 )
 
 target_link_libraries(provider_sdk_unit_tests PRIVATE
