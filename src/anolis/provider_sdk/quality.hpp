@@ -7,8 +7,8 @@
 
 #include <cstdint>
 
+#include "anolis/provider_sdk/result.hpp"  // adpp alias
 #include "protocol.pb.h"
-#include "result.hpp"  // adpp alias (same-dir sibling)
 
 namespace anolis::provider_sdk {
 

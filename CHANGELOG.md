@@ -18,7 +18,7 @@ home; no provider-facing API yet.
   ADPP proto as the `anolis::adpp_proto` target (the SDK now owns the proto pin +
   protobuf/vcpkg baseline for the fleet).
 - The `anolis::provider_sdk` static library target (C++20) carrying the public
-  header tree under `include/anolis/provider_sdk/` (placeholder API surface).
+  header tree under `src/anolis/provider_sdk/` (placeholder API surface).
 - CI (`ok` aggregator: Linux/Windows build+test, clang-format, diff-only
   clang-tidy gate, version-sync), TSAN hardening lane, weekly dependency CVE
   scan, and a source-tarball release workflow.

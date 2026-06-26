@@ -128,14 +128,18 @@ configure_file(
 # DeviceAdapter<HandleT> framework on its PUBLIC include interface. Consumed as
 # source/FetchContent so TSAN/static/arm64 rebuild protobuf in-tree.
 add_library(anolis_provider_sdk STATIC
-    src/version.cpp
+    src/anolis/provider_sdk/version.cpp
 )
 add_library(anolis::provider_sdk ALIAS anolis_provider_sdk)
 
+# Public headers live under src/ with the fleet-wide `-I src` convention (the same
+# layout as anolis-provider-{ezo,sim,bread}); the SDK is consumed from source so
+# there is no public/private install boundary to separate. Generated headers
+# (version.hpp) come from the build tree.
 target_include_directories(anolis_provider_sdk PUBLIC
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>"
-    "$<INSTALL_INTERFACE:include>"
+    "$<INSTALL_INTERFACE:src>"
 )
 target_link_libraries(anolis_provider_sdk PUBLIC
     anolis::adpp_proto
