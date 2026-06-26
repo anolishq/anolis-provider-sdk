@@ -10,9 +10,10 @@
 // D.3a Logger tests: level parsing/formatting, threshold gating (via a cerr
 // capture), and the env-init defaulting. Lifted from sim's Logger.
 
-namespace log = anolis::provider_sdk::logging;
-using log::Logger;
-using log::LogLevel;
+// NB: don't alias this to `log` — it collides with the global C `::log` (math) on MSVC.
+namespace lg = anolis::provider_sdk::logging;
+using lg::Logger;
+using lg::LogLevel;
 
 namespace {
 
