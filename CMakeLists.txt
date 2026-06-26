@@ -157,7 +157,20 @@ if(WIN32)
     target_compile_definitions(anolis_provider_sdk PUBLIC _CRT_SECURE_NO_WARNINGS)
 endif()
 
-if(BUILD_TESTING)
+# Build the SDK's own test suite only when it is the top-level project — not when
+# a provider consumes it via FetchContent/add_subdirectory (where BUILD_TESTING is
+# the consumer's, and pulling in the SDK's gtest tree would be wrong). Consumers
+# can still force it on with -DANOLIS_PROVIDER_SDK_BUILD_TESTS=ON.
+# (CMAKE_SOURCE_DIR == CMAKE_CURRENT_SOURCE_DIR is the pre-3.21 PROJECT_IS_TOP_LEVEL.)
+if(NOT DEFINED ANOLIS_PROVIDER_SDK_BUILD_TESTS)
+    if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+        set(ANOLIS_PROVIDER_SDK_BUILD_TESTS ON)
+    else()
+        set(ANOLIS_PROVIDER_SDK_BUILD_TESTS OFF)
+    endif()
+endif()
+
+if(BUILD_TESTING AND ANOLIS_PROVIDER_SDK_BUILD_TESTS)
     find_package(GTest CONFIG REQUIRED)
     add_subdirectory(tests/unit)
 endif()
