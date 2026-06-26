@@ -45,9 +45,14 @@ consume it as **source via FetchContent** — never a prebuilt binary.
 - **Consumed as source/FetchContent, never prebuilt.** TSAN / `x64-linux-static`
   / `arm64` all rebuild protobuf in-tree with the consumer's flags. Do not add an
   `install()`/`export()`/`find_package` config until a packaged consumer exists.
-- **Public headers live under `include/anolis/provider_sdk/`** (the library API
-  surface), not `src/` — `.clang-tidy`'s `HeaderFilterRegex` includes `include/`
-  for that reason. `src/` is private implementation.
+- **Headers + TUs live together under `src/` with `-I src`** — the fleet-wide
+  convention (same as `anolis-provider-{ezo,sim,bread}`), not a `include/` split.
+  Public headers are `src/anolis/provider_sdk/*.hpp`, included full-path as
+  `#include "anolis/provider_sdk/x.hpp"`. The SDK is consumed from source, so
+  there is no public/private install boundary to separate. (This also keeps the
+  clang-tidy diff gate green: it lints changed headers as standalone files and
+  resolves their includes by interpolating a same-directory TU's `-I src` — a
+  pure `include/` tree has no co-located TU and breaks that. See #3.)
 - **The device descriptor is `DeviceAdapter<HandleT>` — templated over the
   provider's session handle** (ezo `EzoHandle`, bread `crumbs::Session`, sim
   `std::monostate`). Handle acquisition is provider-local and happens before

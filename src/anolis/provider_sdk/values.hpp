@@ -22,8 +22,8 @@
 #include <cstdint>
 #include <string>
 
+#include "anolis/provider_sdk/result.hpp"  // adpp alias + ValueMap
 #include "protocol.pb.h"
-#include "result.hpp"  // adpp alias + ValueMap (same-dir sibling)
 
 namespace anolis::provider_sdk {
 

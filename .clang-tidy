@@ -12,11 +12,9 @@ Checks: >
   -performance-enum-size
 # Note: consider re-enabling specific readability checks once bugprone/perf are clean.
 WarningsAsErrors: ""
-# Limit diagnostics to the SDK's own source roots. Unlike the provider servers
-# (which keep all code under src/), this is a LIBRARY: its public API surface —
-# the header-only DeviceAdapter<HandleT> framework — lives under include/, so
-# include/ is part of the lint scope. Generated protobuf sources live under
-# build/ and are excluded (clang-tidy is also disabled on the proto CMake target
-# so compile_commands does not drag them in).
-HeaderFilterRegex: ".*/(include|src|tests)/.*"
+# Limit diagnostics to the SDK's own source roots. Public headers + TUs live
+# together under src/ (the fleet-wide `-I src` convention), tests under tests/.
+# Generated protobuf sources live under build/ and are excluded (clang-tidy is
+# also disabled on the proto CMake target so compile_commands does not drag them in).
+HeaderFilterRegex: ".*/(src|tests)/.*"
 FormatStyle: file
