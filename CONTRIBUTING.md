@@ -22,7 +22,7 @@ ctest --preset ci-linux-release
 
 vcpkg resolves dependencies during configure (`VCPKG_ROOT` must point at a vcpkg
 checkout). clang-format / clang-tidy are pinned to 18.1.8 via the shared
-`setup-clang-tools` action — match that locally (workstation-configs ships it).
+`setup-clang-tools` action — install the same pinned binary locally to match.
 
 ## Changing the public API
 
