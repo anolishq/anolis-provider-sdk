@@ -7,12 +7,13 @@ Shared C++ SDK for [Anolis Device Provider Protocol](https://github.com/anolishq
 [`anolis-provider-bread`](https://github.com/anolishq/anolis-provider-bread) —
 share, so a new provider is "implement the device seam, get the protocol for free."
 
-> **Status: scaffold (0.1.0).** The repository is being stood up as the home for
-> the Wave-5 extraction (epic [anolis-protocol#45](https://github.com/anolishq/anolis-protocol/issues/45)).
-> The spine and device-model framework are lifted in subsequent steps; today the
-> repo builds, re-exports the ADPP proto, and passes a smoke test.
+> **Status: v0.1.2 — the spine and device-model framework are lifted and
+> consumed by all three reference providers** (each pins the SDK by release
+> tarball; the SDK is the fleet's single declarant of the `anolis-protocol`
+> pin). Extraction history: epic
+> [anolis-protocol#45](https://github.com/anolishq/anolis-protocol/issues/45).
 
-## What it provides (target shape)
+## What it provides
 
 - **The spine** — framed-stdio transport (`uint32_le` length-prefixed protobuf),
   the request dispatch / run-loop, the lifecycle/handshake handler skeleton, the
