@@ -6,19 +6,40 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [0.1.0] — scaffold
+## [0.1.2] — 2026-06-26
 
-Initial repository scaffold (epic anolis-protocol#45, step #52). Establishes the
-build, CI, and hygiene foundation so the spine and device-model framework have a
-home; no provider-facing API yet.
+### Fixed
+
+- `apply_min_timestamp` no longer masks `FAULT`/`UNKNOWN` qualities as `STALE`
+  (staleness downgrades only an `OK` reading). (#12)
+
+## [0.1.1] — 2026-06-26
 
 ### Added
 
+- Per-device health enrichment hook: adapters can supply `DeviceHealth`
+  metrics + `last_seen` for the provider health report. (#11)
+
+## [0.1.0] — 2026-06-26
+
+First consumable release (epic anolis-protocol#45). Note: this entry was
+originally written at scaffold time and under-described the tag — v0.1.0
+already shipped the lifted spine and device-model framework (D.3b/D.3c),
+not a placeholder API.
+
+### Added
+
+- **The spine**: `ProviderRuntime` + `run_loop` (§3.2 Hello gate, dispatch,
+  exit codes), generic ADPP handlers, framed-stdio transport, config toolkit,
+  logging and signal helpers.
+- **The device-model framework**: header-only `DeviceAdapter<HandleT>`,
+  neutral `AdapterReadResult`/`AdapterCallResult` types, quality/staleness
+  helpers, `device_spec`.
 - CMake build that FetchContent's `anolis-protocol` v1.6.0 and re-exports the
   ADPP proto as the `anolis::adpp_proto` target (the SDK now owns the proto pin +
   protobuf/vcpkg baseline for the fleet).
 - The `anolis::provider_sdk` static library target (C++20) carrying the public
-  header tree under `src/anolis/provider_sdk/` (placeholder API surface).
+  header tree under `src/anolis/provider_sdk/`.
 - CI (`ok` aggregator: Linux/Windows build+test, clang-format, diff-only
   clang-tidy gate, version-sync), TSAN hardening lane, weekly dependency CVE
   scan, and a source-tarball release workflow.
@@ -26,5 +47,7 @@ home; no provider-facing API yet.
   triplets, `tsan.supp` / `valgrind.supp`, Renovate, `AGENTS.md`.
 - A proto smoke test proving the re-export links and round-trips a message.
 
-[Unreleased]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/anolishq/anolis-provider-sdk/releases/tag/v0.1.0
