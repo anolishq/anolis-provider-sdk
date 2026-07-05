@@ -6,6 +6,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.3] — 2026-07-04
+
+Maintenance release (docs + CI only; no library code changes).
+
+### Changed
+
+- CI: bump the shared `setup-vcpkg` pin to v2.3. (#13)
+
+### Documentation
+
+- README/CHANGELOG reflect the shipped v0.1.2 surface. (#15)
+- Replace private repo references with the public install path. (#14)
+
 ## [0.1.2] — 2026-06-26
 
 ### Fixed
@@ -47,7 +60,8 @@ not a placeholder API.
   triplets, `tsan.supp` / `valgrind.supp`, Renovate, `AGENTS.md`.
 - A proto smoke test proving the re-export links and round-trips a message.
 
-[Unreleased]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/anolishq/anolis-provider-sdk/releases/tag/v0.1.0
