@@ -53,6 +53,7 @@ struct ReadinessReport {
 // `last_seen` into the structured DeviceHealth.last_seen field only when engaged.
 // Both members default to "absent" so a non-overriding provider's wire output is
 // unchanged (empty map => metrics untouched; nullopt => last_seen left unset).
+// Reserved metric key names and their semantics: docs/metrics.md.
 struct DeviceHealthExtra {
     std::map<std::string, std::string> metrics;
     std::optional<google::protobuf::Timestamp> last_seen;
