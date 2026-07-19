@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `docs/metrics.md`: reserved device-health metric vocabulary
+  (`io_ok` / `io_failed` / `io_retried_attempts`, protocol-counter
+  separation, `last_seen` honesty) so independent providers stay
+  consistent without sharing code. Contract-only — the SDK defines key
+  semantics; each provider implements them at the layer that performs
+  the attempts. Both bread (0.3.3+) and ezo (0.3.1+) already conform
+  (anolishq/anolis-provider-ezo#100).
+
 ## [0.1.3] — 2026-07-04
 
 Maintenance release (docs + CI only; no library code changes).

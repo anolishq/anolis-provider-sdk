@@ -26,6 +26,11 @@ share, so a new provider is "implement the device seam, get the protocol for fre
   `anolis-protocol` pin and the protobuf/vcpkg baseline for the fleet, exposed as
   the `anolis::adpp_proto` target.
 
+- **Contracts, not code, where code would couple** — the reserved device-health
+  metric vocabulary lives in [`docs/metrics.md`](docs/metrics.md): key names and
+  semantics the SDK pins, implemented per-provider at whatever layer is honest
+  for its transport.
+
 Provider-specific concerns (sim physics/actuation, bread CRUMBS framing, ezo's
 i2c bus executor, each provider's device taxonomy) stay in the provider.
 
