@@ -6,7 +6,10 @@ names and pins their semantics so independent providers stay consistent
 without sharing code: the SDK defines *what the keys mean*; each provider
 implements them at whatever layer is honest for its transport. Consumers (the
 anolis runtime's `/v0/providers/health` passthrough, dashboards) treat the
-values as opaque strings — nothing here couples a provider to any consumer.
+values as opaque strings — except where a key below is noted as consumed
+typed: the anolis health-timeseries ingestion parses those reserved keys
+strictly (base-10 integers; exactly `true`/`false` booleans), and a value in
+any other format is silently dropped from the timeseries.
 
 Conformance is per-key: a provider that emits a reserved key MUST follow its
 contract below. Providers are free to emit additional provider-specific keys;
@@ -56,6 +59,48 @@ Where a provider distinguishes transport success from payload validity, the
 protocol-level outcome belongs in separate keys (e.g. ezo's
 `sample_success_count` / `sample_failure_count` / `call_success_count` /
 `call_failure_count`). Do not fold protocol failures into `io_failed`.
+
+### Command-watchdog state
+
+Providers whose devices carry a firmware command watchdog (BREAD
+`SET_WATCHDOG`/`GET_WATCHDOG` vocabulary; bread today) report it under these
+keys, sourced from a live status query — never from cached provider state:
+
+| key | meaning |
+|---|---|
+| `watchdog_armed` | `true`/`false` — whether the firmware watchdog is armed. |
+| `watchdog_timeout_ms` | Configured timeout in milliseconds. |
+| `watchdog_tripped` | `true`/`false` — latched trip indicator. |
+| `watchdog_trip_count` | Cumulative trips since device boot. |
+
+Rules:
+
+- **Omit, don't fabricate.** When the device lacks the capability, the
+  watchdog is not configured, or the live query fails, the keys are absent —
+  a reader must treat absence as "unknown", not "disarmed".
+- Booleans are the strings `true`/`false`; counters follow the same
+  cumulative/monotonic convention as the I/O counters, except the reset point
+  is the *device* (firmware boot), not the provider process.
+- These keys are consumed downstream as typed fields (anolis
+  `telemetry-health-timeseries` contract), so their formats are load-bearing.
+  (`watchdog_trip_count` is a `uint8` on the BREAD wire and wraps at 255;
+  "monotonic" holds between wraps.)
+
+### Presence flags
+
+| key | meaning |
+|---|---|
+| `missing` | The provider expected/configured this device but could not bring it up (bread; optional free-text `missing_detail` alongside). |
+| `excluded` | The device was excluded from operation after startup failures (ezo). |
+
+Rules:
+
+- **Emitted only when true.** Absence means not-missing / not-excluded; a
+  provider must not emit `missing="false"` or `excluded="false"` — an
+  explicit false changes timeseries semantics (an explicit point vs. no
+  point).
+- Value is the string `true`. Consumed downstream as typed booleans (anolis
+  `telemetry-health-timeseries` contract), so the format is load-bearing.
 
 ### `last_seen` (structured field, not a metrics key)
 
