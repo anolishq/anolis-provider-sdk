@@ -5,10 +5,12 @@ add_executable(provider_sdk_unit_tests
     logging_test.cpp
     spine_test.cpp
     device_handlers_test.cpp
+    i2c_test.cpp
 )
 
 target_link_libraries(provider_sdk_unit_tests PRIVATE
     anolis::provider_sdk
+    anolis::provider_sdk_i2c
     GTest::gtest_main
 )
 
