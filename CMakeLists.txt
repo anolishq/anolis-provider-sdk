@@ -157,6 +157,29 @@ if(WIN32)
     target_compile_definitions(anolis_provider_sdk PUBLIC _CRT_SECURE_NO_WARNINGS)
 endif()
 
+# --- The I2C transport module (separable) ---------------------------------
+# A distinct target, NOT part of anolis_provider_sdk: the shared raw-I2C seam
+# (bus interface + LinuxI2cBus + fault-injecting decorator + IoStats) used by
+# hardware providers (bread, ezo) and ignored by non-I2C providers (sim). Kept
+# out of the hw-agnostic SDK core; protocol-agnostic, so it depends only on
+# Threads. See anolis-provider-sdk#19.
+add_library(anolis_provider_sdk_i2c STATIC
+    src/anolis/provider_sdk/i2c/linux_i2c_bus.cpp
+    src/anolis/provider_sdk/i2c/fault_injecting_i2c_bus.cpp
+)
+add_library(anolis::provider_sdk_i2c ALIAS anolis_provider_sdk_i2c)
+target_include_directories(anolis_provider_sdk_i2c PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
+    "$<INSTALL_INTERFACE:src>"
+)
+target_link_libraries(anolis_provider_sdk_i2c PUBLIC Threads::Threads)
+target_compile_features(anolis_provider_sdk_i2c PUBLIC cxx_std_20)
+anolis_provider_sdk_apply_warnings(anolis_provider_sdk_i2c)
+
+if(WIN32)
+    target_compile_definitions(anolis_provider_sdk_i2c PUBLIC _CRT_SECURE_NO_WARNINGS)
+endif()
+
 # Build the SDK's own test suite only when it is the top-level project — not when
 # a provider consumes it via FetchContent/add_subdirectory (where BUILD_TESTING is
 # the consumer's, and pulling in the SDK's gtest tree would be wrong). Consumers
