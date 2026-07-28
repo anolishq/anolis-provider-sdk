@@ -366,3 +366,162 @@ TEST(DeviceHandlersTest, DeviceHealthEnrichmentReachesFailedDeviceOnGetHealthOnl
     ASSERT_EQ(ld_resp.list_devices().device_health_size(), 1);  // live "temp" only
     EXPECT_EQ(ld_resp.list_devices().device_health(0).device_id(), "temp");
 }
+
+//=============================================================================
+// Per-device state override (ezo#87) + provider-metrics hook (ezo#88)
+//=============================================================================
+
+namespace {
+// Overrides a live device's state to FAULT and provides provider metrics + an
+// escalated provider state.
+struct StateOverrideMock : DeviceMock {
+    sdk::DeviceHealthExtra device_health(const std::string& id) const override {
+        sdk::DeviceHealthExtra e;
+        if (id == "temp") {
+            e.state = adpp::DeviceHealth::STATE_FAULT;
+            e.message = "latest read failed";
+        }
+        return e;
+    }
+    sdk::ProviderHealthExtra provider_health() const override {
+        sdk::ProviderHealthExtra e;
+        e.metrics["excluded_devices"] = "1";
+        e.metrics["impl"] = "evil";  // must not overwrite the fixed lifecycle key
+        return e;
+    }
+};
+
+// Healthy startup (no failed devices) so the provider state is OK unless a
+// provider override escalates it.
+struct HealthyEscalateMock : DeviceMock {
+    sdk::ReadinessReport readiness() const override {
+        sdk::ReadinessReport r;
+        r.configured_device_count = 1;
+        r.successful_device_ids = {"temp"};
+        r.provider_impl = "mock";
+        r.startup_policy = "strict";
+        return r;
+    }
+    sdk::ProviderHealthExtra provider_health() const override {
+        sdk::ProviderHealthExtra e;
+        e.state = adpp::ProviderHealth::STATE_DEGRADED;
+        e.message = "i2c executor stopped";
+        return e;
+    }
+};
+}  // namespace
+
+TEST(DeviceHandlersTest, DeviceStateOverrideReplacesReadinessState) {
+    StateOverrideMock rt;
+    adpp::GetHealthRequest req;
+    adpp::Response resp;
+    sdk::handlers::handle_get_health(req, resp, rt);
+    bool saw_temp = false;
+    for (const auto& dh : resp.get_health().devices()) {
+        if (dh.device_id() == "temp") {
+            saw_temp = true;
+            EXPECT_EQ(dh.state(), adpp::DeviceHealth::STATE_FAULT);
+            EXPECT_EQ(dh.message(), "latest read failed");
+        }
+    }
+    EXPECT_TRUE(saw_temp);
+}
+
+TEST(DeviceHandlersTest, DeviceStateNoOverrideKeepsReadinessDerivedState) {
+    DeviceMock rt;  // no override
+    adpp::GetHealthRequest req;
+    adpp::Response resp;
+    sdk::handlers::handle_get_health(req, resp, rt);
+    ASSERT_EQ(resp.get_health().devices_size(), 2);  // temp (live) + flaky (failed)
+    for (const auto& dh : resp.get_health().devices()) {
+        if (dh.device_id() == "temp") {
+            EXPECT_EQ(dh.state(), adpp::DeviceHealth::STATE_OK);
+            EXPECT_EQ(dh.message(), "ok");  // message is part of the backward-compat surface
+        } else if (dh.device_id() == "flaky") {
+            EXPECT_EQ(dh.state(), adpp::DeviceHealth::STATE_UNREACHABLE);
+            EXPECT_EQ(dh.message(), "init timeout");
+        }
+    }
+}
+
+TEST(DeviceHandlersTest, ProviderMetricsMergedFixedKeysWin) {
+    StateOverrideMock rt;
+    adpp::GetHealthRequest req;
+    adpp::Response resp;
+    sdk::handlers::handle_get_health(req, resp, rt);
+    const auto& m = resp.get_health().provider().metrics();
+    ASSERT_TRUE(m.contains("excluded_devices"));
+    EXPECT_EQ(m.at("excluded_devices"), "1");
+    // The fixed lifecycle key wins over the provider's colliding value.
+    ASSERT_TRUE(m.contains("impl"));
+    EXPECT_EQ(m.at("impl"), "mock");
+}
+
+TEST(DeviceHandlersTest, ProviderHealthDefaultEmitsOnlyFixedKeys) {
+    DeviceMock rt;  // no provider_health override
+    adpp::GetHealthRequest req;
+    adpp::Response resp;
+    sdk::handlers::handle_get_health(req, resp, rt);
+    const auto& provider = resp.get_health().provider();
+    EXPECT_EQ(provider.metrics().size(), 5);  // impl + startup_policy + configured/initialized/failed
+    EXPECT_TRUE(provider.metrics().contains("startup_failed_devices"));
+    // The startup-derived message is part of the backward-compat surface.
+    EXPECT_EQ(provider.message(), "startup degraded: 1 of 2 devices failed to initialize");
+}
+
+// A mock that overrides a startup-FAILED id's state (must win over UNREACHABLE)
+// and attempts to un-degrade a startup-degraded provider (must be ignored).
+namespace {
+struct FailedIdStateMock : DeviceMock {
+    sdk::DeviceHealthExtra device_health(const std::string& id) const override {
+        sdk::DeviceHealthExtra e;
+        if (id == "flaky") {
+            e.state = adpp::DeviceHealth::STATE_FAULT;
+            e.message = "came up then faulted";
+        }
+        return e;
+    }
+    sdk::ProviderHealthExtra provider_health() const override {
+        sdk::ProviderHealthExtra e;
+        e.state = adpp::ProviderHealth::STATE_OK;  // must NOT un-degrade
+        e.message = "all good (should be ignored)";
+        return e;
+    }
+};
+}  // namespace
+
+TEST(DeviceHandlersTest, DeviceStateOverrideWinsOverFailedIdUnreachable) {
+    FailedIdStateMock rt;
+    adpp::GetHealthRequest req;
+    adpp::Response resp;
+    sdk::handlers::handle_get_health(req, resp, rt);
+    bool saw_flaky = false;
+    for (const auto& dh : resp.get_health().devices()) {
+        if (dh.device_id() == "flaky") {
+            saw_flaky = true;
+            EXPECT_EQ(dh.state(), adpp::DeviceHealth::STATE_FAULT);
+            EXPECT_EQ(dh.message(), "came up then faulted");
+        }
+    }
+    EXPECT_TRUE(saw_flaky);
+}
+
+TEST(DeviceHandlersTest, ProviderStateOverrideCannotUndegrade) {
+    FailedIdStateMock rt;  // startup-degraded; the OK override must be ignored
+    adpp::GetHealthRequest req;
+    adpp::Response resp;
+    sdk::handlers::handle_get_health(req, resp, rt);
+    const auto& provider = resp.get_health().provider();
+    EXPECT_EQ(provider.state(), adpp::ProviderHealth::STATE_DEGRADED);
+    // The ignored escalation must not leave a contradictory "all good" message.
+    EXPECT_NE(provider.message(), "all good (should be ignored)");
+}
+
+TEST(DeviceHandlersTest, ProviderStateOverrideEscalatesToDegraded) {
+    HealthyEscalateMock rt;
+    adpp::GetHealthRequest req;
+    adpp::Response resp;
+    sdk::handlers::handle_get_health(req, resp, rt);
+    EXPECT_EQ(resp.get_health().provider().state(), adpp::ProviderHealth::STATE_DEGRADED);
+    EXPECT_EQ(resp.get_health().provider().message(), "i2c executor stopped");
+}

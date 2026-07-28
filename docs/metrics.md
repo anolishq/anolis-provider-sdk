@@ -122,3 +122,24 @@ requires it:
   retry_count}` with unknown-key rejection.
 - Identity metrics: `address` (`0xNN`; hex case currently differs per
   provider) and a device-kind key (`type` in ezo, `type_id` in bread).
+
+## Provider-level metrics (`ProviderHealthExtra.metrics`)
+
+Distinct from the per-device metrics above, a provider may report aggregate
+metrics for the whole provider through `ProviderHealthExtra.metrics` (the
+defaulted `ProviderRuntime::provider_health()` hook), merged by the SDK into
+`ProviderHealth.metrics`.
+
+The SDK always emits a fixed lifecycle set — `impl`, `startup_policy`,
+`startup_configured_devices`, `startup_initialized_devices`,
+`startup_failed_devices` — and these **win on collision**: a provider MUST NOT
+redefine them. Provider-specific aggregate keys (e.g. `excluded_devices`,
+`call_success_total`, `call_failure_total`, `excluded_reason.<id>`) are free-form
+and follow the same "opaque string, base-10 integer where a consumer parses it"
+convention as the device metrics above.
+
+`ProviderHealthExtra.state` / `message` are an optional, **escalate-only**
+override of `ProviderHealth.state`: a provider engages them to report a state
+the startup report cannot (e.g. `STATE_DEGRADED` when its I/O executor is
+stopped with zero failed devices) and leaves them disengaged when healthy, so
+the override never un-degrades a startup-degraded provider.

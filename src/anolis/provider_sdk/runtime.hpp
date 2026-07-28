@@ -57,6 +57,29 @@ struct ReadinessReport {
 struct DeviceHealthExtra {
     std::map<std::string, std::string> metrics;
     std::optional<google::protobuf::Timestamp> last_seen;
+    // Optional per-device state override (ezo#87). When engaged, it replaces the
+    // SDK's readiness-derived state (OK for a live device, UNREACHABLE for a
+    // startup-failed id) — e.g. FAULT for a live device whose latest read failed,
+    // or STALE for a sample older than its freshness window. The provider is
+    // authoritative about a live device's runtime state, which the startup
+    // readiness report cannot express. Disengaged => the readiness-derived state
+    // is kept, so a non-overriding provider's wire output is unchanged.
+    std::optional<adpp::DeviceHealth::State> state;
+    std::optional<std::string> message;
+};
+
+// Provider-level health enrichment (ezo#88). The SDK merges `metrics` into
+// ProviderHealth.metrics alongside the fixed lifecycle keys (which win on
+// collision), and applies the optional `state`/`message` override when engaged.
+// The override is escalate-only by contract: a provider engages it to report a
+// state the startup report cannot (e.g. DEGRADED when its I/O executor is
+// stopped even with zero failed devices), and leaves it disengaged when healthy
+// so it never un-degrades a startup-degraded provider. All members default to
+// "absent" so a non-overriding provider's wire output is unchanged.
+struct ProviderHealthExtra {
+    std::map<std::string, std::string> metrics;
+    std::optional<adpp::ProviderHealth::State> state;
+    std::optional<std::string> message;
 };
 
 // The seam the generic handlers + run_loop consume. The provider implements it;
@@ -77,6 +100,12 @@ public:
     // in-process only (no live device I/O on this path) and SHOULD take at most one
     // internal snapshot so the returned metrics + last_seen are one atomic view.
     virtual DeviceHealthExtra device_health(const std::string& /*device_id*/) const { return {}; }
+
+    // Provider-level health enrichment (ezo#88). Defaulted so existing providers
+    // need no change. Called once per get_health. In-process only (no device I/O)
+    // and SHOULD take at most one internal snapshot so the returned metrics/state
+    // are one atomic view.
+    virtual ProviderHealthExtra provider_health() const { return {}; }
 
     // Inventory.
     virtual std::vector<std::string> list_device_ids() const = 0;
