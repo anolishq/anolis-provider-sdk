@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.5] — 2026-07-28
+
 ### Added
 
 - **Per-device state override** (`DeviceHealthExtra::state` / `message`, ezo#87):
