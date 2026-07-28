@@ -22,7 +22,7 @@ void set_status_ok(adpp::Response& response) { set_status(response, adpp::Status
 // Provider health derived from the readiness snapshot: DEGRADED if any configured
 // device failed to initialize, else OK. (Lifted from sim's make_provider_health;
 // the SDK owns it so every provider reports health identically.)
-adpp::ProviderHealth make_provider_health(const ReadinessReport& report) {
+adpp::ProviderHealth make_provider_health(const ReadinessReport& report, const ProviderRuntime& runtime) {
     adpp::ProviderHealth health;
     const std::size_t initialized = report.successful_device_ids.size();
     const std::size_t inferred_failed = report.configured_device_count > static_cast<int>(initialized)
@@ -46,6 +46,33 @@ adpp::ProviderHealth make_provider_health(const ReadinessReport& report) {
     metrics["startup_configured_devices"] = std::to_string(report.configured_device_count);
     metrics["startup_initialized_devices"] = std::to_string(initialized);
     metrics["startup_failed_devices"] = std::to_string(failed);
+
+    // ezo#88: merge the provider's aggregate metrics + optional state override.
+    // The fixed lifecycle keys above win on collision (a provider must not
+    // redefine them); the state override is escalate-only by contract, so it can
+    // report DEGRADED the startup report can't but does not un-degrade a
+    // startup-degraded provider.
+    const ProviderHealthExtra extra = runtime.provider_health();
+    for (const auto& [key, value] : extra.metrics) {
+        if (metrics.find(key) == metrics.end()) {
+            metrics[key] = value;
+        }
+    }
+    // Escalate-only, enforced: the override may only make the state worse (state
+    // enum values are monotone OK<DEGRADED<FAULT), so a provider can report
+    // DEGRADED the startup report can't but can never un-degrade a
+    // startup-degraded provider. STATE_UNSPECIFIED (proto3 zero) is ignored. The
+    // message rides the state override so an ignored escalation cannot leave a
+    // contradictory message (DEGRADED state + "all ok"); a message with no state
+    // override is a plain annotation and applies.
+    if (extra.state && *extra.state != adpp::ProviderHealth::STATE_UNSPECIFIED && *extra.state > health.state()) {
+        health.set_state(*extra.state);
+        if (extra.message) {
+            health.set_message(*extra.message);
+        }
+    } else if (extra.message && !extra.state) {
+        health.set_message(*extra.message);
+    }
     return health;
 }
 
@@ -92,6 +119,16 @@ std::vector<adpp::DeviceHealth> make_device_health(const std::vector<std::string
         }
         if (extra.last_seen) {
             *dh.mutable_last_seen() = *extra.last_seen;
+        }
+        // ezo#87: apply the provider's per-device state override last, so it wins
+        // over the readiness-derived state above (the provider is authoritative
+        // about a live device's FAULT/STALE state). Disengaged leaves the state
+        // and message set above unchanged.
+        if (extra.state && *extra.state != adpp::DeviceHealth::STATE_UNSPECIFIED) {
+            dh.set_state(*extra.state);
+        }
+        if (extra.message) {
+            dh.set_message(*extra.message);
         }
         out.push_back(std::move(dh));
     }
@@ -285,7 +322,7 @@ void handle_get_health(const adpp::GetHealthRequest& /*request*/, adpp::Response
                        const ProviderRuntime& runtime) {
     const ReadinessReport report = runtime.readiness();
     auto* out = response.mutable_get_health();
-    *out->mutable_provider() = make_provider_health(report);
+    *out->mutable_provider() = make_provider_health(report, runtime);
 
     // Health for the live inventory, plus any startup-failed devices that are no
     // longer live (so get_health still surfaces a device that failed to init).

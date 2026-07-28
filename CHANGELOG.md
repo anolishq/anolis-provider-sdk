@@ -6,6 +6,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Per-device state override** (`DeviceHealthExtra::state` / `message`, ezo#87):
+  a provider may override the SDK's readiness-derived `DeviceHealth.state` (OK
+  for a live device, UNREACHABLE for a startup-failed id) to report a live-device
+  runtime state the startup report cannot express — `STATE_FAULT` for a failed
+  latest read, `STATE_STALE` for an aged sample. Applied after the readiness
+  state so the provider wins; disengaged leaves the wire output unchanged.
+- **Provider-level health enrichment** (`ProviderHealthExtra` + the defaulted
+  `ProviderRuntime::provider_health()` hook, ezo#88): merges provider aggregate
+  `metrics` into `ProviderHealth.metrics` alongside the fixed lifecycle keys
+  (which win on collision), and applies an optional, escalate-only `state`/
+  `message` override (e.g. DEGRADED when a provider's I/O executor is stopped
+  even with zero failed devices). Defaulted so existing providers are unaffected.
+
 ## [0.1.4] — 2026-07-22
 
 ### Added
