@@ -87,8 +87,8 @@ void write_json(std::string& out, const JsonValue& value, int depth) {
 
     if (const auto* b = std::get_if<bool>(&value.value)) {
         out += *b ? "true" : "false";
-    } else if (const auto* i = std::get_if<std::int64_t>(&value.value)) {
-        out += std::to_string(*i);
+    } else if (const auto* integer = std::get_if<std::int64_t>(&value.value)) {
+        out += std::to_string(*integer);
     } else if (const auto* d = std::get_if<double>(&value.value)) {
         // Setters reject non-finite bounds, so every stored double serializes.
         out += std::format("{}", *d);
