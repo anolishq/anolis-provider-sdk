@@ -6,6 +6,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Config-schema toolkit, part 1 of 2** (`anolis::provider_sdk_config`, #24):
+  the declare-once config declaration model — typed scalar fields (including a
+  built-in I2C-address scalar), enums with display titles, inclusive/exclusive
+  number bounds, min/max array items, discriminator conditionals,
+  `dependentRequired`, parsed-value uniqueness (`x-anolis-unique`)
+  — plus a deterministic JSON Schema (draft 2020-12) emitter and the versioned
+  `--config-schema` envelope writer (executable profile v1 §2). A separable
+  target behind `ANOLIS_PROVIDER_SDK_ENABLE_CONFIG` (default ON). Part 2 adds
+  the YAML validator + typed extraction helpers driven by the same declaration,
+  completing the no-drift guarantee.
+
 ## [0.1.5] — 2026-07-28
 
 ### Added

@@ -14,6 +14,11 @@ target_link_libraries(provider_sdk_unit_tests PRIVATE
     GTest::gtest_main
 )
 
+if(ANOLIS_PROVIDER_SDK_ENABLE_CONFIG)
+    target_sources(provider_sdk_unit_tests PRIVATE config_schema_test.cpp)
+    target_link_libraries(provider_sdk_unit_tests PRIVATE anolis::provider_sdk_config)
+endif()
+
 anolis_provider_sdk_apply_warnings(provider_sdk_unit_tests)
 
 if(WIN32)
