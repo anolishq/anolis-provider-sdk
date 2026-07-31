@@ -15,7 +15,10 @@ target_link_libraries(provider_sdk_unit_tests PRIVATE
 )
 
 if(ANOLIS_PROVIDER_SDK_ENABLE_CONFIG)
-    target_sources(provider_sdk_unit_tests PRIVATE config_schema_test.cpp)
+    target_sources(provider_sdk_unit_tests PRIVATE
+        config_schema_test.cpp
+        config_validate_test.cpp
+    )
     target_link_libraries(provider_sdk_unit_tests PRIVATE anolis::provider_sdk_config)
 endif()
 

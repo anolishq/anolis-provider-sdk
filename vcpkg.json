@@ -4,6 +4,7 @@
   "description": "Shared C++ SDK for Anolis Device Provider Protocol (ADPP) device providers",
   "dependencies": [
     "gtest",
-    "protobuf"
+    "protobuf",
+    "yaml-cpp"
   ]
 }

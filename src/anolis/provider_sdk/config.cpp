@@ -1,5 +1,7 @@
 #include "anolis/provider_sdk/config.hpp"
 
+#include "anolis/provider_sdk/config_internal.hpp"
+
 // Implementation notes:
 //
 // - The JSON writer is deliberately in-house and minimal: the SDK needs
@@ -139,12 +141,12 @@ std::string serialize(const JsonValue& value) {
 }
 
 // ---- built-in I2cAddress constants ---------------------------------------
+// Shared with the validator (config_validate.cpp) via config_internal.hpp so
+// the emitted schema and the enforced range cannot disagree.
 
-constexpr std::int64_t kI2cAddressMin = 0x08;
-constexpr std::int64_t kI2cAddressMax = 0x77;
-// Exactly the 0x08-0x77 range so the emitted schema's string branch is as
-// honest as the integer branch: 0x08-0x0F | 0x10-0x6F | 0x70-0x77.
-constexpr const char* kI2cHexPattern = "^0[xX](0[89a-fA-F]|[1-6][0-9a-fA-F]|7[0-7])$";
+using internal::kI2cAddressMax;
+using internal::kI2cAddressMin;
+using internal::kI2cHexPattern;
 
 // ---- declaration-tree checks ---------------------------------------------
 
