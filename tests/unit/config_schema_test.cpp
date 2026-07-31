@@ -24,6 +24,22 @@
 
 namespace cfg = anolis::provider_sdk::config;
 
+// The Hardening lane's tsan-triplet (dynamic) protobuf mis-parses JSON into an
+// empty Struct (OK status, zero fields) — upstream interaction tracked in
+// sdk#26. The Struct-oracle tests are meaningless there and are skipped; the
+// required Linux/Windows lanes run them, and the golden-text tests (raw bytes,
+// no parse) still run under TSAN.
+#if defined(__SANITIZE_THREAD__)
+#define ANOLIS_SKIP_ORACLE_UNDER_TSAN() GTEST_SKIP() << "Struct JSON-parse oracle unavailable under TSAN (sdk#26)"
+#elif defined(__has_feature)
+#if __has_feature(thread_sanitizer)
+#define ANOLIS_SKIP_ORACLE_UNDER_TSAN() GTEST_SKIP() << "Struct JSON-parse oracle unavailable under TSAN (sdk#26)"
+#endif
+#endif
+#ifndef ANOLIS_SKIP_ORACLE_UNDER_TSAN
+#define ANOLIS_SKIP_ORACLE_UNDER_TSAN() static_cast<void>(0)
+#endif
+
 namespace {
 
 constexpr const char* kIdentPattern = "^[A-Za-z0-9_.-]{1,64}$";
@@ -69,6 +85,27 @@ const google::protobuf::Value* find_path(const google::protobuf::Struct& root, c
         }
     }
     return value;
+}
+
+// Null-safe navigation: a missing key is a test FAILURE, never a deref crash.
+const google::protobuf::Value& at(const google::protobuf::Struct& root, const std::vector<std::string>& path) {
+    static const google::protobuf::Value kMissing;
+    const auto* value = find_path(root, path);
+    if (value == nullptr) {
+        ADD_FAILURE() << "missing path element: " << (path.empty() ? "<root>" : path.back());
+        return kMissing;
+    }
+    return *value;
+}
+
+const google::protobuf::Value& at(const google::protobuf::Struct& obj, const std::string& key) {
+    static const google::protobuf::Value kMissing;
+    const auto* value = find_field(obj, key);
+    if (value == nullptr) {
+        ADD_FAILURE() << "missing key: " << key;
+        return kMissing;
+    }
+    return *value;
 }
 
 // A realistic fixture mirroring anolis-provider-ezo's config surface.
@@ -151,6 +188,7 @@ TEST(ConfigSchemaEnvelope, WriteAppendsTrailingNewline) {
 // assert_config_schema_envelope): parseable JSON object; integer
 // config_schema_version >= 1 (not bool, not float); `schema` a JSON object.
 TEST(ConfigSchemaEnvelope, MirrorsConformanceAssertions) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     const auto envelope = parse_json(cfg::config_schema_envelope(make_ezo_like_schema(), with_provider("ezo")));
 
     const auto* version = find_field(envelope, "config_schema_version");
@@ -181,6 +219,7 @@ TEST(ConfigSchemaEnvelope, OmitsProviderWhenEmpty) {
 }
 
 TEST(ConfigSchemaEnvelope, ExtraStringEntries) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     const cfg::Schema schema{cfg::Object(cfg::Openness::Open)};
     const std::string text = cfg::config_schema_envelope(schema, with_extras("p", {{"provider_version", "1.2.3"}}));
     const auto envelope = parse_json(text);
@@ -201,6 +240,7 @@ TEST(ConfigSchemaEnvelope, ExtraEntryCollidingWithReservedKeyThrows) {
 // ---- schema-level metadata -----------------------------------------------
 
 TEST(ConfigSchemaEmission, SchemaIdTitleDescription) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     cfg::Object root(cfg::Openness::Open);
     root.title("object title");
     const auto schema =
@@ -222,6 +262,7 @@ TEST(ConfigSchemaEmission, SchemaIdTitleDescription) {
 // ---- field emission ------------------------------------------------------
 
 TEST(ConfigSchemaEmission, EnumWithoutTitlesEmitsEnum) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     cfg::Object root(cfg::Openness::Closed);
     root.field(cfg::string_field("mode").enum_value("strict").enum_value("degraded"));
     const auto parsed = parse_json(cfg::to_json_schema(cfg::Schema{std::move(root)}));
@@ -234,6 +275,7 @@ TEST(ConfigSchemaEmission, EnumWithoutTitlesEmitsEnum) {
 }
 
 TEST(ConfigSchemaEmission, EnumWithTitlesEmitsOneOfConstTitle) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     cfg::Object root(cfg::Openness::Closed);
     root.field(cfg::string_field("type").enum_value("ph", "pH Sensor").enum_value("do"));
     const auto parsed = parse_json(cfg::to_json_schema(cfg::Schema{std::move(root)}));
@@ -242,14 +284,15 @@ TEST(ConfigSchemaEmission, EnumWithTitlesEmitsOneOfConstTitle) {
     ASSERT_NE(one_of, nullptr);
     ASSERT_EQ(one_of->list_value().values_size(), 2);
     const auto& first = one_of->list_value().values(0).struct_value();
-    EXPECT_EQ(find_field(first, "const")->string_value(), "ph");
-    EXPECT_EQ(find_field(first, "title")->string_value(), "pH Sensor");
+    EXPECT_EQ(at(first, "const").string_value(), "ph");
+    EXPECT_EQ(at(first, "title").string_value(), "pH Sensor");
     const auto& second = one_of->list_value().values(1).struct_value();
-    EXPECT_EQ(find_field(second, "const")->string_value(), "do");
+    EXPECT_EQ(at(second, "const").string_value(), "do");
     EXPECT_EQ(find_field(second, "title"), nullptr);
 }
 
 TEST(ConfigSchemaEmission, SingleForbiddenValueEmitsNotConst) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     cfg::Object root(cfg::Openness::Closed);
     root.field(cfg::string_field("id").forbid_value("chaos_control", "reserved"));
     const auto parsed = parse_json(cfg::to_json_schema(cfg::Schema{std::move(root)}));
@@ -260,6 +303,7 @@ TEST(ConfigSchemaEmission, SingleForbiddenValueEmitsNotConst) {
 }
 
 TEST(ConfigSchemaEmission, MultipleForbiddenValuesEmitNotEnum) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     cfg::Object root(cfg::Openness::Closed);
     root.field(cfg::string_field("id").forbid_value("a").forbid_value("b"));
     const auto parsed = parse_json(cfg::to_json_schema(cfg::Schema{std::move(root)}));
@@ -270,6 +314,7 @@ TEST(ConfigSchemaEmission, MultipleForbiddenValuesEmitNotEnum) {
 }
 
 TEST(ConfigSchemaEmission, NonEmptyEmitsMinLength) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     cfg::Object root(cfg::Openness::Closed);
     root.field(cfg::string_field("bus_path").non_empty());
     const auto parsed = parse_json(cfg::to_json_schema(cfg::Schema{std::move(root)}));
@@ -300,14 +345,16 @@ TEST(ConfigSchemaEmission, NumberBoundsEmitDoubles) {
 }
 
 TEST(ConfigSchemaEmission, BooleanFieldWithDefault) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     cfg::Object root(cfg::Openness::Closed);
     root.field(cfg::boolean_field("enabled").default_bool(true));
     const auto parsed = parse_json(cfg::to_json_schema(cfg::Schema{std::move(root)}));
-    EXPECT_EQ(find_path(parsed, {"properties", "enabled", "type"})->string_value(), "boolean");
-    EXPECT_TRUE(find_path(parsed, {"properties", "enabled", "default"})->bool_value());
+    EXPECT_EQ(at(parsed, {"properties", "enabled", "type"}).string_value(), "boolean");
+    EXPECT_TRUE(at(parsed, {"properties", "enabled", "default"}).bool_value());
 }
 
 TEST(ConfigSchemaEmission, PlaceholderEmitsAnnotation) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     cfg::Object root(cfg::Openness::Closed);
     root.field(cfg::string_field("bus_path").placeholder("/dev/i2c-1 or mock://name"));
     const auto parsed = parse_json(cfg::to_json_schema(cfg::Schema{std::move(root)}));
@@ -317,6 +364,7 @@ TEST(ConfigSchemaEmission, PlaceholderEmitsAnnotation) {
 }
 
 TEST(ConfigSchemaEmission, I2cAddressShape) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     cfg::Object root(cfg::Openness::Closed);
     root.field(cfg::i2c_address_field("address").default_int(0x61));
     const auto parsed = parse_json(cfg::to_json_schema(cfg::Schema{std::move(root)}));
@@ -325,24 +373,25 @@ TEST(ConfigSchemaEmission, I2cAddressShape) {
     ASSERT_NE(any_of, nullptr);
     ASSERT_EQ(any_of->list_value().values_size(), 2);
     const auto& int_branch = any_of->list_value().values(0).struct_value();
-    EXPECT_EQ(find_field(int_branch, "type")->string_value(), "integer");
-    EXPECT_EQ(find_field(int_branch, "minimum")->number_value(), 8.0);
-    EXPECT_EQ(find_field(int_branch, "maximum")->number_value(), 119.0);
+    EXPECT_EQ(at(int_branch, "type").string_value(), "integer");
+    EXPECT_EQ(at(int_branch, "minimum").number_value(), 8.0);
+    EXPECT_EQ(at(int_branch, "maximum").number_value(), 119.0);
     const auto& string_branch = any_of->list_value().values(1).struct_value();
-    EXPECT_EQ(find_field(string_branch, "type")->string_value(), "string");
+    EXPECT_EQ(at(string_branch, "type").string_value(), "string");
 
-    EXPECT_EQ(find_path(parsed, {"properties", "address", "x-anolis-type"})->string_value(), "i2c_address");
-    EXPECT_EQ(find_path(parsed, {"properties", "address", "default"})->number_value(), 97.0);
+    EXPECT_EQ(at(parsed, {"properties", "address", "x-anolis-type"}).string_value(), "i2c_address");
+    EXPECT_EQ(at(parsed, {"properties", "address", "default"}).number_value(), 97.0);
 }
 
 TEST(ConfigSchemaEmission, I2cHexPatternMatchesExactlyTheAddressableRange) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     cfg::Object root(cfg::Openness::Closed);
     root.field(cfg::i2c_address_field("address"));
     const auto parsed = parse_json(cfg::to_json_schema(cfg::Schema{std::move(root)}));
     const auto* pattern_value = find_path(parsed, {"properties", "address", "anyOf"});
     ASSERT_NE(pattern_value, nullptr);
     const auto& string_branch = pattern_value->list_value().values(1).struct_value();
-    const std::regex pattern(find_field(string_branch, "pattern")->string_value(), std::regex::ECMAScript);
+    const std::regex pattern(at(string_branch, "pattern").string_value(), std::regex::ECMAScript);
 
     for (const char* accepted : {"0x08", "0x61", "0x77", "0X0f", "0x10", "0x6F", "0x70"}) {
         EXPECT_TRUE(std::regex_search(accepted, pattern)) << accepted;
@@ -355,6 +404,7 @@ TEST(ConfigSchemaEmission, I2cHexPatternMatchesExactlyTheAddressableRange) {
 // ---- object / array emission ---------------------------------------------
 
 TEST(ConfigSchemaEmission, ClosedObjectEmitsAdditionalPropertiesFalse) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     const auto parsed = parse_json(cfg::to_json_schema(cfg::Schema{cfg::Object(cfg::Openness::Closed)}));
     const auto* additional = find_field(parsed, "additionalProperties");
     ASSERT_NE(additional, nullptr);
@@ -362,22 +412,25 @@ TEST(ConfigSchemaEmission, ClosedObjectEmitsAdditionalPropertiesFalse) {
 }
 
 TEST(ConfigSchemaEmission, OpenObjectOmitsAdditionalProperties) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     const auto parsed = parse_json(cfg::to_json_schema(cfg::Schema{cfg::Object(cfg::Openness::Open)}));
     EXPECT_EQ(find_field(parsed, "additionalProperties"), nullptr);
 }
 
 TEST(ConfigSchemaEmission, UniqueScalarArray) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     cfg::Object root(cfg::Openness::Closed);
     root.array("addresses", cfg::Array::of_scalars(cfg::i2c_address_field("address")).min_items(1).unique());
     const auto parsed = parse_json(cfg::to_json_schema(cfg::Schema{std::move(root)}));
 
     EXPECT_NE(find_path(parsed, {"properties", "addresses", "items", "anyOf"}), nullptr);
-    EXPECT_EQ(find_path(parsed, {"properties", "addresses", "minItems"})->number_value(), 1.0);
-    EXPECT_TRUE(find_path(parsed, {"properties", "addresses", "uniqueItems"})->bool_value());
-    EXPECT_TRUE(find_path(parsed, {"properties", "addresses", "x-anolis-unique"})->bool_value());
+    EXPECT_EQ(at(parsed, {"properties", "addresses", "minItems"}).number_value(), 1.0);
+    EXPECT_TRUE(at(parsed, {"properties", "addresses", "uniqueItems"}).bool_value());
+    EXPECT_TRUE(at(parsed, {"properties", "addresses", "x-anolis-unique"}).bool_value());
 }
 
 TEST(ConfigSchemaEmission, UniqueFieldInsideObjectArrayEmitsAnnotation) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     const auto parsed = parse_json(cfg::to_json_schema(make_ezo_like_schema()));
     const auto* unique = find_path(parsed, {"properties", "devices", "items", "properties", "id", "x-anolis-unique"});
     ASSERT_NE(unique, nullptr);
@@ -385,6 +438,7 @@ TEST(ConfigSchemaEmission, UniqueFieldInsideObjectArrayEmitsAnnotation) {
 }
 
 TEST(ConfigSchemaEmission, DependentRequired) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     cfg::Object root(cfg::Openness::Closed);
     root.field(cfg::number_field("ambient_temp_c"));
     root.field(cfg::string_field("ambient_signal_path").non_empty());
@@ -401,6 +455,7 @@ TEST(ConfigSchemaEmission, DependentRequired) {
 // vacuously satisfied when the discriminator is absent, which would fire every
 // branch's `then` simultaneously on an invalid document.
 TEST(ConfigSchemaEmission, ConditionalIfRequiresDiscriminator) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     cfg::Object root(cfg::Openness::Closed);
     root.field(cfg::string_field("mode").required().enum_value("scan").enum_value("manual"));
     root.array("addresses", cfg::Array::of_scalars(cfg::i2c_address_field("address")).min_items(1).unique());
@@ -417,7 +472,7 @@ TEST(ConfigSchemaEmission, ConditionalIfRequiresDiscriminator) {
     ASSERT_NE(if_required, nullptr);
     ASSERT_EQ(if_required->list_value().values_size(), 1);
     EXPECT_EQ(if_required->list_value().values(0).string_value(), "mode");
-    EXPECT_EQ(find_path(manual_branch, {"if", "properties", "mode", "const"})->string_value(), "manual");
+    EXPECT_EQ(at(manual_branch, {"if", "properties", "mode", "const"}).string_value(), "manual");
     const auto* then_required = find_path(manual_branch, {"then", "required"});
     ASSERT_NE(then_required, nullptr);
     EXPECT_EQ(then_required->list_value().values(0).string_value(), "addresses");
@@ -431,6 +486,7 @@ TEST(ConfigSchemaEmission, ConditionalIfRequiresDiscriminator) {
 }
 
 TEST(ConfigSchemaEmission, EscapingRoundTrips) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     const std::string tricky = "quote:\" backslash:\\ newline:\n tab:\t bell:\x07 micro:µ";
     cfg::Object root(cfg::Openness::Open);
     root.field(cfg::string_field("note").description(tricky));
@@ -441,14 +497,15 @@ TEST(ConfigSchemaEmission, EscapingRoundTrips) {
 }
 
 TEST(ConfigSchemaEmission, EzoLikeFixtureParsesAndCarriesFormMetadata) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     const auto parsed = parse_json(cfg::to_json_schema(make_ezo_like_schema()));
 
     // Everything the workbench needs to render forms without a catalog:
-    EXPECT_EQ(find_path(parsed, {"properties", "hardware", "properties", "query_delay_us", "default"})->number_value(),
+    EXPECT_EQ(at(parsed, {"properties", "hardware", "properties", "query_delay_us", "default"}).number_value(),
               300000.0);
     EXPECT_NE(find_path(parsed, {"properties", "hardware", "properties", "bus_path", "x-anolis-placeholder"}), nullptr);
     EXPECT_NE(find_path(parsed, {"properties", "devices", "items", "properties", "type", "oneOf"}), nullptr);
-    EXPECT_EQ(find_path(parsed, {"properties", "discovery", "properties", "mode", "const"})->string_value(), "manual");
+    EXPECT_EQ(at(parsed, {"properties", "discovery", "properties", "mode", "const"}).string_value(), "manual");
     const auto* required = find_field(parsed, "required");
     ASSERT_NE(required, nullptr);
     EXPECT_EQ(required->list_value().values_size(), 2);  // hardware, discovery
@@ -778,12 +835,13 @@ TEST(ConfigSchemaBuilder, ExclusiveAndInclusiveBoundConflictThrows) {
 }
 
 TEST(ConfigSchemaEmission, ExclusiveNumberBounds) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     // motorctl-style bound: max_speed in (0, 10000].
     cfg::Object root(cfg::Openness::Closed);
     root.field(cfg::number_field("max_speed").exclusive_min_number(0.0).max_number(10000.0));
     const auto parsed = parse_json(cfg::to_json_schema(cfg::Schema{std::move(root)}));
-    EXPECT_EQ(find_path(parsed, {"properties", "max_speed", "exclusiveMinimum"})->number_value(), 0.0);
-    EXPECT_EQ(find_path(parsed, {"properties", "max_speed", "maximum"})->number_value(), 10000.0);
+    EXPECT_EQ(at(parsed, {"properties", "max_speed", "exclusiveMinimum"}).number_value(), 0.0);
+    EXPECT_EQ(at(parsed, {"properties", "max_speed", "maximum"}).number_value(), 10000.0);
     EXPECT_EQ(find_path(parsed, {"properties", "max_speed", "minimum"}), nullptr);
 }
 
@@ -794,12 +852,13 @@ TEST(ConfigSchemaTreeChecks, DefaultViolatingExclusiveBoundThrows) {
 }
 
 TEST(ConfigSchemaEmission, MaxItems) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     // sim's temp_range: exactly two numbers.
     cfg::Object root(cfg::Openness::Closed);
     root.array("temp_range", cfg::Array::of_scalars(cfg::number_field("bound")).min_items(2).max_items(2));
     const auto parsed = parse_json(cfg::to_json_schema(cfg::Schema{std::move(root)}));
-    EXPECT_EQ(find_path(parsed, {"properties", "temp_range", "minItems"})->number_value(), 2.0);
-    EXPECT_EQ(find_path(parsed, {"properties", "temp_range", "maxItems"})->number_value(), 2.0);
+    EXPECT_EQ(at(parsed, {"properties", "temp_range", "minItems"}).number_value(), 2.0);
+    EXPECT_EQ(at(parsed, {"properties", "temp_range", "maxItems"}).number_value(), 2.0);
 }
 
 TEST(ConfigSchemaTreeChecks, InvertedItemBoundsThrow) {
@@ -809,6 +868,7 @@ TEST(ConfigSchemaTreeChecks, InvertedItemBoundsThrow) {
 }
 
 TEST(ConfigSchemaEmission, ExponentFormDoubleStaysValidJson) {
+    ANOLIS_SKIP_ORACLE_UNDER_TSAN();
     cfg::Object root(cfg::Openness::Closed);
     root.field(cfg::number_field("epsilon").min_number(1e-7));
     const auto parsed = parse_json(cfg::to_json_schema(cfg::Schema{std::move(root)}));
