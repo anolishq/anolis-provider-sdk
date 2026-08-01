@@ -15,9 +15,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `dependentRequired`, parsed-value uniqueness (`x-anolis-unique`)
   — plus a deterministic JSON Schema (draft 2020-12) emitter and the versioned
   `--config-schema` envelope writer (executable profile v1 §2). A separable
-  target behind `ANOLIS_PROVIDER_SDK_ENABLE_CONFIG` (default ON). Part 2 adds
-  the YAML validator + typed extraction helpers driven by the same declaration,
-  completing the no-drift guarantee.
+  target behind `ANOLIS_PROVIDER_SDK_ENABLE_CONFIG` (default ON).
+- **Config-schema toolkit, part 2 of 2** (#24): the YAML validator + typed
+  extraction helpers driven by the SAME declaration, completing the no-drift
+  guarantee. `validate()` collects ALL errors with dotted paths; scalars type
+  by the YAML 1.2 core schema (quoted `"300"` is a string; plain `0x63` is an
+  integer; `5.0` satisfies `integer`; no YAML-1.1 `yes`/`on` booleans), so the
+  emitted schema is honest about what `--check-config` accepts. Uniqueness
+  compares PARSED values (`0x08` vs `"0x08"` collide). The extraction helpers
+  (`as_string`/`as_int64`/`as_double`/`as_bool`/`parse_i2c_address`) share the
+  resolver so post-validation parsing cannot diverge either. Adds a PUBLIC
+  yaml-cpp dependency to the config module (already carried by every
+  provider). Contract + rollout guidance: `docs/config-schema.md`.
 
 ## [0.1.5] — 2026-07-28
 

@@ -190,14 +190,20 @@ endif()
 option(ANOLIS_PROVIDER_SDK_ENABLE_CONFIG "Build the config-schema toolkit module" ON)
 
 if(ANOLIS_PROVIDER_SDK_ENABLE_CONFIG)
+    # The validator half consumes parsed YAML (`YAML::Node` is on the public
+    # config_validate.hpp API), hence the PUBLIC yaml-cpp dependency — already
+    # carried by every provider in the fleet.
+    find_package(yaml-cpp CONFIG REQUIRED)
     add_library(anolis_provider_sdk_config STATIC
         src/anolis/provider_sdk/config.cpp
+        src/anolis/provider_sdk/config_validate.cpp
     )
     add_library(anolis::provider_sdk_config ALIAS anolis_provider_sdk_config)
     target_include_directories(anolis_provider_sdk_config PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
         "$<INSTALL_INTERFACE:src>"
     )
+    target_link_libraries(anolis_provider_sdk_config PUBLIC yaml-cpp::yaml-cpp)
     target_compile_features(anolis_provider_sdk_config PUBLIC cxx_std_20)
     anolis_provider_sdk_apply_warnings(anolis_provider_sdk_config)
 
