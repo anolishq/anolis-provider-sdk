@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-08-01
+
 ### Added
 
 - **Config-schema toolkit, part 1 of 2** (`anolis::provider_sdk_config`, #24):
@@ -129,7 +131,9 @@ not a placeholder API.
   triplets, `tsan.supp` / `valgrind.supp`, Renovate, `AGENTS.md`.
 - A proto smoke test proving the re-export links and round-trips a message.
 
-[Unreleased]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.5...v0.2.0
+[0.1.5]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.1...v0.1.2
