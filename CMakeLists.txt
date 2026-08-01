@@ -180,6 +180,32 @@ if(WIN32)
     target_compile_definitions(anolis_provider_sdk_i2c PUBLIC _CRT_SECURE_NO_WARNINGS)
 endif()
 
+# --- The config-schema toolkit module (separable) --------------------------
+# The declare-once config toolkit (sdk#24): a provider declares its config
+# schema once; the SDK emits the `--config-schema` envelope (executable
+# profile v1 §2) and — in part 2 of the lift — validates a parsed config
+# against the same declaration. A distinct target (same pattern as the i2c
+# module) behind an option: part 2 adds a yaml-cpp dependency here, and the
+# option lets non-config consumers opt out of carrying it.
+option(ANOLIS_PROVIDER_SDK_ENABLE_CONFIG "Build the config-schema toolkit module" ON)
+
+if(ANOLIS_PROVIDER_SDK_ENABLE_CONFIG)
+    add_library(anolis_provider_sdk_config STATIC
+        src/anolis/provider_sdk/config.cpp
+    )
+    add_library(anolis::provider_sdk_config ALIAS anolis_provider_sdk_config)
+    target_include_directories(anolis_provider_sdk_config PUBLIC
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
+        "$<INSTALL_INTERFACE:src>"
+    )
+    target_compile_features(anolis_provider_sdk_config PUBLIC cxx_std_20)
+    anolis_provider_sdk_apply_warnings(anolis_provider_sdk_config)
+
+    if(WIN32)
+        target_compile_definitions(anolis_provider_sdk_config PUBLIC _CRT_SECURE_NO_WARNINGS)
+    endif()
+endif()
+
 # Build the SDK's own test suite only when it is the top-level project — not when
 # a provider consumes it via FetchContent/add_subdirectory (where BUILD_TESTING is
 # the consumer's, and pulling in the SDK's gtest tree would be wrong). Consumers
