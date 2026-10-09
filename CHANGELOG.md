@@ -38,8 +38,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   its driver's values: on i2c-bcm2835 a stuck transfer then times out after the
   i2c core's 1 s default, and a NACK still returns at once.
   **Breaking:** the constructor drops its `timeout_ms` parameter
-  (`LinuxI2cBus(bus_path, retry_count)`); providers' `timeout_ms` config no
-  longer reaches the bus.
+  (`LinuxI2cBus(bus_path, retry_count)`). That parameter only fed
+  `I2C_TIMEOUT`; a provider's `timeout_ms` config keeps any other use it has
+  (bread's CRUMBS reply deadline, ezo's job deadlines).
 
 ## [0.2.0] — 2026-08-01
 
