@@ -17,8 +17,8 @@
 
 namespace anolis::provider_sdk::i2c {
 
-LinuxI2cBus::LinuxI2cBus(std::string bus_path, int timeout_ms, int retry_count)
-    : bus_path_(std::move(bus_path)), timeout_ms_(std::max(timeout_ms, 1)), retry_count_(std::max(retry_count, 0)) {}
+LinuxI2cBus::LinuxI2cBus(std::string bus_path, int retry_count)
+    : bus_path_(std::move(bus_path)), retry_count_(std::max(retry_count, 0)) {}
 
 LinuxI2cBus::~LinuxI2cBus() { close(); }
 
@@ -46,11 +46,6 @@ I2cStatus LinuxI2cBus::open() {
         return I2cStatus::failure(I2cError::OpenFailed, "failed to open " + bus_path_ + ": " + std::strerror(saved),
                                   saved);
     }
-    // I2C_TIMEOUT unit is 10ms.
-    (void)::ioctl(fd_, I2C_TIMEOUT, std::max(1, timeout_ms_ / 10));
-    // Disable the kernel's own I2C_RETRIES loop (adapter-global, EAGAIN-only) so
-    // every attempt is issued and counted here. See ezo#100 for the full note.
-    (void)::ioctl(fd_, I2C_RETRIES, 0);
     opened_ = true;
     return I2cStatus::ok();
 #else
