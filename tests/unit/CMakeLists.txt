@@ -6,6 +6,8 @@ add_executable(provider_sdk_unit_tests
     spine_test.cpp
     device_handlers_test.cpp
     i2c_test.cpp
+    host_check_test.cpp
+    i2c_host_checks_test.cpp
 )
 
 target_link_libraries(provider_sdk_unit_tests PRIVATE

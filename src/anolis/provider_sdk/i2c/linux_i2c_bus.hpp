@@ -5,10 +5,19 @@
  * @brief Real i2c-dev implementation of I2cBus.
  *
  * Consolidates the I2C mechanics previously duplicated in bread's
- * `LinuxTransport` and ezo's `LinuxSession`: open + I2C_TIMEOUT +
- * adapter-global I2C_RETRIES=0 (so every attempt is counted here, ezo#100),
- * an I2C_RDWR-based atomic write_then_read, a retry-budgeted write, and a
- * deadline-bounded poll read for the request/response (CRUMBS) pattern.
+ * `LinuxTransport` and ezo's `LinuxSession`: open, an I2C_RDWR-based atomic
+ * write_then_read, a retry-budgeted write, and a deadline-bounded poll read for
+ * the request/response (CRUMBS) pattern.
+ *
+ * It sets no adapter-global kernel state. I2C_TIMEOUT and I2C_RETRIES apply to
+ * every process on the adapter, so with several providers on one bus the last
+ * to open would set them for all (#31). The values live on the adapter and
+ * outlast the process that set them, so an adapter keeps whatever was last set
+ * until its driver is rebound (a reboot); from boot it has the driver's values.
+ * Then the i2c core times a stuck transfer out after its default (1 s when the
+ * driver sets none, as i2c-bcm2835 does); a NACK still returns at once. On an
+ * adapter whose driver sets retries, the kernel repeats an arbitration-lost
+ * (EAGAIN) transfer inside one attempt counted here; i2c-bcm2835 sets none.
  */
 
 #include <cstdint>
@@ -23,10 +32,9 @@ class LinuxI2cBus final : public I2cBus {
 public:
     /**
      * @param bus_path     device node, e.g. "/dev/i2c-1".
-     * @param timeout_ms   per-transaction I2C_TIMEOUT (kernel-side).
      * @param retry_count  userspace retry budget for write / write_then_read.
      */
-    LinuxI2cBus(std::string bus_path, int timeout_ms, int retry_count);
+    LinuxI2cBus(std::string bus_path, int retry_count);
     ~LinuxI2cBus() override;
 
     LinuxI2cBus(const LinuxI2cBus &) = delete;
@@ -46,7 +54,6 @@ public:
 
 private:
     std::string bus_path_;
-    int timeout_ms_;
     int retry_count_;
     int fd_ = -1;
     bool opened_ = false;

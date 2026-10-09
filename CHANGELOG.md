@@ -6,6 +6,39 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Opaque claims** (`claims.hpp`, anolishq/anolis#318): `kClaimTag`
+  (`anolis.claim`) and `add_claim()`, which adds a key to a device's
+  space-separated claim tag without repeats. The runtime is moving its
+  ownership check from parsing `hw.bus_path` / `hw.i2c_address` to exact-string
+  uniqueness over these keys.
+- **I2C claim key** (`i2c::claim_key`): `i2c:<bus_path>:0x<aa>`, lowercase
+  two-digit hex — the form the runtime normalized the old tags to, so moving to
+  claims changes no collision.
+- **`--check-host` support** (`host_check.hpp`, executable profile v1 §6): the
+  `Requirement` type, `write_envelope()` (prints the envelope and returns the
+  exit code, 1 exactly when something is unmet), and `readiness_diagnostics()`
+  for the `host_check` / `host_unmet` readiness keys. Host text that is not
+  valid UTF-8 is replaced, so the envelope always parses.
+- **i2c-dev host checks** (`i2c::check_host`), read-only: `i2c.bus_present`,
+  `i2c.bus_access` (opens the node read-write; on denial names the node's group
+  and mode; `unknown` when run as root, which opens anything), and, given a
+  maximum, `i2c.bus_clock` from the device tree's `clock-frequency` (`unknown`
+  where the platform does not expose it).
+
+### Changed
+
+- **`LinuxI2cBus` no longer sets `I2C_TIMEOUT` or `I2C_RETRIES`** (#31). Both
+  are adapter-global, so with several providers on one bus the last to open set
+  them for all (bread 150 ms and ezo 300 ms on bioreactor-v1). The values live
+  on the adapter, so it keeps the last ones set until a reboot; from boot it has
+  its driver's values: on i2c-bcm2835 a stuck transfer then times out after the
+  i2c core's 1 s default, and a NACK still returns at once.
+  **Breaking:** the constructor drops its `timeout_ms` parameter
+  (`LinuxI2cBus(bus_path, retry_count)`); providers' `timeout_ms` config no
+  longer reaches the bus.
+
 ## [0.2.0] — 2026-08-01
 
 ### Added

@@ -133,6 +133,8 @@ add_library(anolis_provider_sdk STATIC
     src/anolis/provider_sdk/logging.cpp
     src/anolis/provider_sdk/handlers.cpp
     src/anolis/provider_sdk/runtime.cpp
+    src/anolis/provider_sdk/claims.cpp
+    src/anolis/provider_sdk/host_check.cpp
 )
 add_library(anolis::provider_sdk ALIAS anolis_provider_sdk)
 
@@ -162,10 +164,13 @@ endif()
 # (bus interface + LinuxI2cBus + fault-injecting decorator + IoStats) used by
 # hardware providers (bread, ezo) and ignored by non-I2C providers (sim). Kept
 # out of the hw-agnostic SDK core; protocol-agnostic, so it depends only on
-# Threads. See anolis-provider-sdk#19.
+# Threads. See anolis-provider-sdk#19. Its host checks return the core's
+# host_check::Requirement, a plain struct used from the header alone.
 add_library(anolis_provider_sdk_i2c STATIC
     src/anolis/provider_sdk/i2c/linux_i2c_bus.cpp
     src/anolis/provider_sdk/i2c/fault_injecting_i2c_bus.cpp
+    src/anolis/provider_sdk/i2c/claims.cpp
+    src/anolis/provider_sdk/i2c/host_checks.cpp
 )
 add_library(anolis::provider_sdk_i2c ALIAS anolis_provider_sdk_i2c)
 target_include_directories(anolis_provider_sdk_i2c PUBLIC
