@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-10-08
+
 ### Added
 
 - **Opaque claims** (`claims.hpp`, anolishq/anolis#318): `kClaimTag`
@@ -164,7 +166,8 @@ not a placeholder API.
   triplets, `tsan.supp` / `valgrind.supp`, Renovate, `AGENTS.md`.
 - A proto smoke test proving the re-export links and round-trips a message.
 
-[Unreleased]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.5...v0.2.0
 [0.1.5]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.3...v0.1.4
