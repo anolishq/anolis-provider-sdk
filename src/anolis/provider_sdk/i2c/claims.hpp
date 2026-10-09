@@ -8,7 +8,6 @@
 // given, and a lowercase two-digit hex address, e.g. `i2c:/dev/i2c-1:0x0a`. Two
 // different paths to one adapter (a symlink) are different keys, as before.
 
-#include <cstdint>
 #include <string>
 #include <string_view>
 

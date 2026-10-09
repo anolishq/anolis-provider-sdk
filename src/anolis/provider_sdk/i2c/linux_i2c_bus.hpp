@@ -11,8 +11,10 @@
  *
  * It sets no adapter-global kernel state. I2C_TIMEOUT and I2C_RETRIES apply to
  * every process on the adapter, so with several providers on one bus the last
- * to open would set them for all (#31); the adapter keeps its driver's values.
- * The i2c core then times a stuck transfer out after its default (1 s when the
+ * to open would set them for all (#31). The values live on the adapter and
+ * outlast the process that set them, so an adapter keeps whatever was last set
+ * until its driver is rebound (a reboot); from boot it has the driver's values.
+ * Then the i2c core times a stuck transfer out after its default (1 s when the
  * driver sets none, as i2c-bcm2835 does); a NACK still returns at once. On an
  * adapter whose driver sets retries, the kernel repeats an arbitration-lost
  * (EAGAIN) transfer inside one attempt counted here; i2c-bcm2835 sets none.

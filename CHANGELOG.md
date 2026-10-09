@@ -31,8 +31,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - **`LinuxI2cBus` no longer sets `I2C_TIMEOUT` or `I2C_RETRIES`** (#31). Both
   are adapter-global, so with several providers on one bus the last to open set
-  them for all (bread 150 ms and ezo 300 ms on bioreactor-v1). The adapter keeps
-  its driver's values: on i2c-bcm2835 a stuck transfer now times out after the
+  them for all (bread 150 ms and ezo 300 ms on bioreactor-v1). The values live
+  on the adapter, so it keeps the last ones set until a reboot; from boot it has
+  its driver's values: on i2c-bcm2835 a stuck transfer then times out after the
   i2c core's 1 s default, and a NACK still returns at once.
   **Breaking:** the constructor drops its `timeout_ms` parameter
   (`LinuxI2cBus(bus_path, retry_count)`); providers' `timeout_ms` config no
