@@ -102,6 +102,24 @@ Rules:
 - Value is the string `true`. Consumed downstream as typed booleans (anolis
   `telemetry-health-timeseries` contract), so the format is load-bearing.
 
+### Identity strings
+
+| key | meaning |
+|---|---|
+| `firmware_version` | The firmware revision the device itself reports, as an opaque string (for example `1.0.0`). |
+
+Rules:
+
+- **Omit, don't fabricate.** When the device does not report a revision, the
+  key is absent.
+- Report what the device says, never a value derived from the provider's own
+  build or from configuration.
+- The value is a string, and consumers must not parse it as a version. The
+  anolis health timeseries stores it as a string field and truncates anything
+  over 128 bytes.
+- It describes the device's firmware, not the device type's schema, which
+  ADPP already carries as `type_version`.
+
 ### `last_seen` (structured field, not a metrics key)
 
 `DeviceHealthExtra.last_seen` is set only from a **genuine success** — a real
