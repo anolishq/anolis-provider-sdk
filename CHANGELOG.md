@@ -6,6 +6,25 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-10-16
+
+Maintenance release (docs + CI only; no library code changes).
+
+### Changed
+
+- CI: bump the shared `anolishq/.github` actions to v2.4 and refresh the
+  pinned action digests. (#36, #40)
+
+### Documentation
+
+- `docs/metrics.md`: reserve `firmware_version` as a device identity string
+  — the firmware revision the device itself reports, as an opaque string;
+  omitted when the device reports none, never parsed as a version, and
+  distinct from ADPP's `type_version`. (#38, #39)
+- Correct the 0.3.0 entry: a provider's `timeout_ms` config keeps its other
+  uses; only the `LinuxI2cBus` constructor parameter that fed `I2C_TIMEOUT`
+  went away. (#35)
+
 ## [0.3.0] — 2026-10-08
 
 ### Added
@@ -167,7 +186,8 @@ not a placeholder API.
   triplets, `tsan.supp` / `valgrind.supp`, Renovate, `AGENTS.md`.
 - A proto smoke test proving the re-export links and round-trips a message.
 
-[Unreleased]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.5...v0.2.0
 [0.1.5]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.4...v0.1.5
