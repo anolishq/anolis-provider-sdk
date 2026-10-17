@@ -100,18 +100,21 @@ protobuf_generate(
 )
 
 # Compatibility shim: keep existing includes of "protocol.pb.h" working after proto split.
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/protocol.pb.h"
-"#pragma once\n"
-"#include \"anolis/deviceprovider/v1/call.pb.h\"\n"
-"#include \"anolis/deviceprovider/v1/envelope.pb.h\"\n"
-"#include \"anolis/deviceprovider/v1/handshake.pb.h\"\n"
-"#include \"anolis/deviceprovider/v1/health.pb.h\"\n"
-"#include \"anolis/deviceprovider/v1/inventory.pb.h\"\n"
-"#include \"anolis/deviceprovider/v1/readiness.pb.h\"\n"
-"#include \"anolis/deviceprovider/v1/status.pb.h\"\n"
-"#include \"anolis/deviceprovider/v1/telemetry.pb.h\"\n"
-"#include \"anolis/deviceprovider/v1/types.pb.h\"\n"
-"#include \"anolis/deviceprovider/v1/value.pb.h\"\n")
+# file(CONFIGURE) leaves the file (and its mtime) alone when the content is
+# unchanged, so a reconfigure does not rebuild every TU that includes it.
+file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/protocol.pb.h" CONTENT
+"#pragma once
+#include \"anolis/deviceprovider/v1/call.pb.h\"
+#include \"anolis/deviceprovider/v1/envelope.pb.h\"
+#include \"anolis/deviceprovider/v1/handshake.pb.h\"
+#include \"anolis/deviceprovider/v1/health.pb.h\"
+#include \"anolis/deviceprovider/v1/inventory.pb.h\"
+#include \"anolis/deviceprovider/v1/readiness.pb.h\"
+#include \"anolis/deviceprovider/v1/status.pb.h\"
+#include \"anolis/deviceprovider/v1/telemetry.pb.h\"
+#include \"anolis/deviceprovider/v1/types.pb.h\"
+#include \"anolis/deviceprovider/v1/value.pb.h\"
+" @ONLY)
 
 add_library(anolis::adpp_proto ALIAS adpp_proto)
 
