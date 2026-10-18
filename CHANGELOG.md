@@ -6,6 +6,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- The `protocol.pb.h` compatibility shim is written with `file(CONFIGURE)`,
+  which leaves it untouched when its content is unchanged. It was rewritten
+  on every configure, so a reconfigure that changed nothing rebuilt every
+  translation unit that includes it. (#41)
+
 ## [0.3.1] — 2026-10-16
 
 Maintenance release (docs + CI only; no library code changes).
