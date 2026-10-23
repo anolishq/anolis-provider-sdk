@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <sstream>
@@ -160,6 +161,100 @@ TEST(SpineTest, WaitReadyAfterHelloProjectsDiagnosticsAndFiresHook) {
     EXPECT_EQ(wr_resp.wait_ready().diagnostics().at("device_count"), "2");
     EXPECT_EQ(wr_resp.wait_ready().diagnostics().at("provider_version"), "9.9.9");
     EXPECT_EQ(wr_resp.wait_ready().diagnostics().at("startup_degraded"), "false");
+}
+
+// anolis-protocol#76: the initialize hook runs once, after Hello and before
+// the first reply that needs the provider started, so Hello never waits on
+// it. A runtime whose inventory exists only once the hook has run shows that
+// the WaitReady reply comes after it.
+class LateRuntime : public MockRuntime {
+public:
+    sdk::ReadinessReport readiness() const override {
+        sdk::ReadinessReport r = MockRuntime::readiness();
+        if (!started) {
+            r.successful_device_ids.clear();
+        }
+        return r;
+    }
+    bool started = false;
+};
+
+struct InitializeCalls {
+    std::vector<std::chrono::milliseconds> budgets;
+    sdk::LifecycleHooks hooks(LateRuntime& rt) {
+        sdk::LifecycleHooks h;
+        h.initialize = [this, &rt](std::chrono::milliseconds budget) {
+            budgets.push_back(budget);
+            rt.started = true;
+        };
+        return h;
+    }
+};
+
+adpp::Request wait_ready_request(uint64_t id, uint32_t hint_ms) {
+    adpp::Request req;
+    req.set_request_id(id);
+    req.mutable_wait_ready()->set_max_wait_ms_hint(hint_ms);
+    return req;
+}
+
+TEST(SpineTest, HelloIsAnsweredWithoutRunningInitialize) {
+    LateRuntime rt;
+    InitializeCalls calls;
+    std::stringstream in(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream out(std::ios::in | std::ios::out | std::ios::binary);
+    push_request(in, hello_request());
+
+    EXPECT_EQ(sdk::run_loop(in, out, rt, calls.hooks(rt)), 0);
+    EXPECT_TRUE(calls.budgets.empty());
+    const auto responses = drain_responses(out);
+    ASSERT_EQ(responses.size(), 1u);
+    EXPECT_EQ(responses[0].status().code(), adpp::Status::CODE_OK);
+    EXPECT_TRUE(responses[0].has_hello());
+}
+
+TEST(SpineTest, InitializeRunsOnceBeforeTheWaitReadyReplyWithItsHint) {
+    LateRuntime rt;
+    InitializeCalls calls;
+    std::stringstream in(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream out(std::ios::in | std::ios::out | std::ios::binary);
+    push_request(in, hello_request());
+    push_request(in, wait_ready_request(2, 7000));
+    push_request(in, wait_ready_request(3, 7000));
+
+    EXPECT_EQ(sdk::run_loop(in, out, rt, calls.hooks(rt)), 0);
+    ASSERT_EQ(calls.budgets.size(), 1u);
+    EXPECT_EQ(calls.budgets[0], std::chrono::milliseconds{7000});
+    const auto responses = drain_responses(out);
+    ASSERT_EQ(responses.size(), 3u);
+    EXPECT_EQ(responses[1].wait_ready().diagnostics().at("device_count"), "2");
+}
+
+TEST(SpineTest, InitializeRunsBeforeAnyFirstRequestWithNoBudget) {
+    LateRuntime rt;
+    InitializeCalls calls;
+    std::stringstream in(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream out(std::ios::in | std::ios::out | std::ios::binary);
+    push_request(in, hello_request());
+    adpp::Request health;
+    health.set_request_id(2);
+    health.mutable_get_health();
+    push_request(in, health);
+
+    EXPECT_EQ(sdk::run_loop(in, out, rt, calls.hooks(rt)), 0);
+    ASSERT_EQ(calls.budgets.size(), 1u);
+    EXPECT_EQ(calls.budgets[0], std::chrono::milliseconds{0});
+}
+
+TEST(SpineTest, ARequestBeforeHelloDoesNotRunInitialize) {
+    LateRuntime rt;
+    InitializeCalls calls;
+    std::stringstream in(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream out(std::ios::in | std::ios::out | std::ios::binary);
+    push_request(in, wait_ready_request(1, 7000));
+
+    EXPECT_EQ(sdk::run_loop(in, out, rt, calls.hooks(rt)), 0);
+    EXPECT_TRUE(calls.budgets.empty());
 }
 
 TEST(SpineTest, UnrecognizedRequestFallsThroughToUnimplemented) {

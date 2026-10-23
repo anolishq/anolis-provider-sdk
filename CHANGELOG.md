@@ -6,6 +6,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `LifecycleHooks::initialize(budget)` runs once, after a successful Hello
+  and before the first request after it is handled
+  (anolishq/anolis-protocol#76). A provider whose start-up is slow, such as
+  bread probing an unpowered bus, can move it there and answer Hello at
+  once. Normally the first request is WaitReady, and `budget` is its
+  `max_wait_ms_hint`; for any other first request it is 0, meaning no hint.
+  The hook runs on the loop's thread and blocks that reply, so the WaitReady
+  reply reflects what it did. The default does nothing, so providers that
+  don't set it behave as before.
+
 ### Fixed
 
 - The `protocol.pb.h` compatibility shim is written with `file(CONFIGURE)`,

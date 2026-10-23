@@ -1,5 +1,6 @@
 #include "anolis/provider_sdk/runtime.hpp"
 
+#include <chrono>
 #include <cstdint>
 #include <istream>
 #include <ostream>
@@ -25,6 +26,15 @@ private:
     const LifecycleHooks& hooks_;
 };
 
+// The first request's budget for LifecycleHooks::initialize: WaitReady's hint,
+// or 0 (no hint) for any other request.
+std::chrono::milliseconds initialize_budget(const adpp::Request& request) {
+    if (!request.has_wait_ready()) {
+        return std::chrono::milliseconds{0};
+    }
+    return std::chrono::milliseconds{request.wait_ready().max_wait_ms_hint()};
+}
+
 }  // namespace
 
 int run_loop(std::istream& input, std::ostream& output, ProviderRuntime& runtime, const LifecycleHooks& hooks) {
@@ -36,6 +46,7 @@ int run_loop(std::istream& input, std::ostream& output, ProviderRuntime& runtime
     // with CODE_FAILED_PRECONDITION. The session is this process's stdio stream,
     // so a local flag suffices.
     bool hello_completed = false;
+    bool initialized = false;
 
     while (true) {
         frame.clear();
@@ -52,6 +63,13 @@ int run_loop(std::istream& input, std::ostream& output, ProviderRuntime& runtime
         response.set_request_id(request.request_id());
         response.mutable_status()->set_code(adpp::Status::CODE_INTERNAL);
         response.mutable_status()->set_message("uninitialized");
+
+        // The provider's start-up runs once, after Hello and before the first
+        // request it would answer from the inventory (anolis-protocol#76).
+        if (hello_completed && !initialized && !request.has_hello()) {
+            initialized = true;
+            hooks.initialize(initialize_budget(request));
+        }
 
         if (request.has_hello()) {
             handlers::handle_hello(request.hello(), response, runtime);
