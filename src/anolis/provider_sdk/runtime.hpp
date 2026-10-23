@@ -12,6 +12,7 @@
 // the loop is stdio-I/O-bound, so the per-request vtable cost is irrelevant and
 // the spine compiles once.
 
+#include <chrono>
 #include <functional>
 #include <map>
 #include <optional>
@@ -123,6 +124,15 @@ public:
 // Provider-specific loop actions. All default to no-op; the SDK calls them at the
 // right point in run_loop (sim: start/stop its physics ticker).
 struct LifecycleHooks {
+    // Runs once, after a successful Hello and before the first request after it
+    // is handled (anolis-protocol#76), so a provider whose start-up is slow
+    // (bread probing an unpowered bus) answers Hello at once instead of after
+    // it. Normally that first request is WaitReady, and `budget` is its
+    // max_wait_ms_hint; for any other request, or a hint of 0, `budget` is 0,
+    // meaning no hint. The hook runs on the loop's thread and blocks the reply,
+    // so a provider SHOULD finish within a non-zero budget and report what it
+    // has.
+    std::function<void(std::chrono::milliseconds budget)> initialize = [](std::chrono::milliseconds) {};
     std::function<void()> on_wait_ready = [] {};  // after a successful wait_ready
     std::function<void()> on_shutdown = [] {};    // on ANY exit from the loop
 };
