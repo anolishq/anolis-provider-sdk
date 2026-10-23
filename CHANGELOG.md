@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-10-22
+
 ### Added
 
 - `LifecycleHooks::initialize(budget)` runs once, after a successful Hello
@@ -24,6 +26,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   which leaves it untouched when its content is unchanged. It was rewritten
   on every configure, so a reconfigure that changed nothing rebuilt every
   translation unit that includes it. (#41)
+
+### Changed
+
+- CI, the hardening lane and the release workflow's build-and-test run on
+  ubuntu-26.04. (#44) The release publishes source only, and providers build
+  it with their own toolchain, so nothing a provider ships changes.
 
 ## [0.3.1] — 2026-10-16
 
