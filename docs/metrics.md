@@ -22,7 +22,7 @@ they must not redefine reserved ones.
 | key | meaning |
 |---|---|
 | `io_ok` | Operations that reached the transport and ultimately succeeded. |
-| `io_failed` | Operations that reached the transport and ultimately failed, after the provider's retry budget was exhausted. |
+| `io_failed` | Operations that reached the transport and ultimately failed, either after the provider's retry budget was exhausted or on a failure the provider does not retry. |
 | `io_retried_attempts` | Every attempt beyond an operation's first — including attempts whose operation eventually succeeded. |
 
 Contract:
@@ -42,7 +42,7 @@ Contract:
   `io_failed`; where the transport sees only electrical success (ezo: a raw
   I2C transaction), a garbage or not-ready payload counts in `io_ok` and the
   failure surfaces in protocol-level counters (see below). Each provider
-  documents which failure classes its transport layer can see.
+  should document which failure classes its transport layer can see.
 - **Operations that never reach the transport are not I/O.** Validation
   failures, not-open errors, and queue timeouts observed above the transport
   are excluded.
@@ -70,7 +70,7 @@ keys, sourced from a live status query — never from cached provider state:
 |---|---|
 | `watchdog_armed` | `true`/`false` — whether the firmware watchdog is armed. |
 | `watchdog_timeout_ms` | Configured timeout in milliseconds. |
-| `watchdog_tripped` | `true`/`false` — latched trip indicator. |
+| `watchdog_tripped` | `true`/`false` — whether the watchdog has expired since the last clear. Latched only on firmware that advertises the per-type `CLEAR_WATCHDOG_TRIP` capability; on other firmware the next valid command frame, `SET_WATCHDOG` included, clears it. |
 | `watchdog_trip_count` | Cumulative trips since device boot. |
 
 Rules:
@@ -161,3 +161,6 @@ override of `ProviderHealth.state`: a provider engages them to report a state
 the startup report cannot (e.g. `STATE_DEGRADED` when its I/O executor is
 stopped with zero failed devices) and leaves them disengaged when healthy, so
 the override never un-degrades a startup-degraded provider.
+The accompanying `message` applies only when the escalation is accepted; a
+`message` engaged without a `state` always replaces `ProviderHealth.message`,
+including on a startup-degraded provider.
