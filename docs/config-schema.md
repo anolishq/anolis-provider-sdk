@@ -44,9 +44,10 @@ JSON Schema is honest about what `--check-config` accepts:
 
 - a **quoted** scalar (or `!!str`) is a string — `timeout_ms: "300"` is a
   type error against `type: integer`;
-- a **plain** scalar resolves by the core rules: `true`/`false` (only — no
-  YAML-1.1 `yes`/`on`) are booleans; `300`, `0x63`, `0o17` are integers
-  (`010` is decimal ten); `0.5`, `5e-3`, `.inf`, `.nan` are floats;
+- a **plain** scalar resolves by the core rules: `true`/`false` (also
+  `True`/`TRUE`/`False`/`FALSE`; no YAML-1.1 `yes`/`on`) are booleans; `300`,
+  `0x63`, `0o17` are integers (`010` is decimal ten); `0.5`, `5e-3`, `.inf`,
+  `.nan` are floats; an empty value, `~`, `null`/`Null`/`NULL` are null;
   anything else is a string;
 - per JSON Schema semantics `type: integer` also accepts a zero-fraction
   float (`5.0`) but never `5.7`; `type: number` rejects the non-finite
@@ -54,14 +55,16 @@ JSON Schema is honest about what `--check-config` accepts:
 
 Known deviations from a pure JSON Schema validator (deliberate):
 
-- integers outside int64 (`2^63` and beyond) are rejected by `--check-config`
-  even though the emitted `type: integer` has no such cap — no provider config
-  value can exceed int64;
+- integers at or above `2^63`, and below `-2^63 - 1024`, are rejected by
+  `--check-config` even though the emitted `type: integer` has no such cap — no
+  provider config value can exceed int64; literals from `-2^63 - 1` down to
+  `-2^63 - 1024` round to `-2^63` and are accepted (and extracted) as
+  `INT64_MIN`;
 - a **duplicated map key** is rejected outright: YAML parsers disagree
   (yaml-cpp serves the first occurrence, PyYAML the last, js-yaml throws), so
   validating either occurrence would bless an ambiguous document;
 - YAML **merge keys** (`<<`) are not supported by yaml-cpp: on a Closed object
-  they fail as `unknown key '<<'` (plain anchors/aliases DO work).
+  they fail as `<path>.<<: unknown key` (plain anchors/aliases DO work).
 
 The typed extraction helpers use the **same resolver**, so what validation
 accepted, extraction converts identically — do not mix them with yaml-cpp's
@@ -119,7 +122,7 @@ if (arg == "--config-schema") {
 }
 
 // load_config: LoadFile -> validate (throw ALL errors) -> extract via the
-// typed helpers (delete the hand-written parse_int_value/parse_address_text)
+// typed helpers (delete the provider's hand-written scalar/address parsers)
 const auto errors = config::validate(provider_schema(), root);
 if (!errors.empty()) {
     throw std::runtime_error("invalid config:\n" + config::format_errors(errors));

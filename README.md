@@ -7,10 +7,11 @@ Shared C++ SDK for [Anolis Device Provider Protocol](https://github.com/anolishq
 [`anolis-provider-bread`](https://github.com/anolishq/anolis-provider-bread) —
 share, so a new provider is "implement the device seam, get the protocol for free."
 
-> **Status: v0.1.2 — the spine and device-model framework are lifted and
-> consumed by all three reference providers** (each pins the SDK by release
+> **Status: v0.4.0 — the spine and device-model framework are lifted and
+> consumed by all three reference providers** (each pins its own SDK release
 > tarball; the SDK is the fleet's single declarant of the `anolis-protocol`
-> pin). Extraction history: epic
+> build pin, v1.6.0; each provider's CI pins its own `anolis-protocol[conformance]`
+> wheel). Extraction history: epic
 > [anolis-protocol#45](https://github.com/anolishq/anolis-protocol/issues/45).
 
 ## What it provides
@@ -23,8 +24,8 @@ share, so a new provider is "implement the device seam, get the protocol for fre
   `AdapterReadResult` / `AdapterCallResult` result types, the `quality_from`
   staleness helper, and `default_ids_from` for the §7.2 default signal set.
 - **The proto re-export** — the SDK is the single declarant of the
-  `anolis-protocol` pin and the protobuf/vcpkg baseline for the fleet, exposed as
-  the `anolis::adpp_proto` target.
+  `anolis-protocol` build pin, exposed as the `anolis::adpp_proto` target. Each
+  provider declares its own protobuf dependency and vcpkg baseline.
 - **Host requirements and claims** (anolishq/anolis#318) — the `--check-host`
   envelope and its readiness keys (`host_check.hpp`, executable profile v1 §6),
   the `anolis.claim` device tag (`claims.hpp`), and, in the I2C module, the
