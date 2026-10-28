@@ -68,7 +68,7 @@ jobs:
     name: Docs
     needs: [changes]
     if: needs.changes.outputs.docs == 'true'
-    uses: anolishq/.github/.github/workflows/docs-check.yml@0199b6cc7cb73a02d58f75ec8ed763ac40e54dca # v2
+    uses: anolishq/.github/.github/workflows/docs-check.yml@7b20551d1532b9e4f1264c9e966fa6ebbf098d75 # v2
 
   build-and-test-linux:
     name: Linux Build and Test
@@ -89,7 +89,7 @@ jobs:
           sudo apt-get install -y cmake ninja-build g++
 
       - name: Setup vcpkg
-        uses: anolishq/.github/.github/actions/setup-vcpkg@f79b717dbf5b2153fbe5d390894dd5432af5dbe1 # v2.5
+        uses: anolishq/.github/.github/actions/setup-vcpkg@7b20551d1532b9e4f1264c9e966fa6ebbf098d75 # v2.6
         with:
           triplet: x64-linux-static
 
@@ -119,7 +119,7 @@ jobs:
           path: anolis-provider-sdk
 
       - name: Setup vcpkg
-        uses: anolishq/.github/.github/actions/setup-vcpkg@f79b717dbf5b2153fbe5d390894dd5432af5dbe1 # v2.5
+        uses: anolishq/.github/.github/actions/setup-vcpkg@7b20551d1532b9e4f1264c9e966fa6ebbf098d75 # v2.6
         with:
           triplet: x64-windows
 
@@ -141,7 +141,7 @@ jobs:
   version-sync:
     needs: [changes]
     if: needs.changes.outputs.code == 'true'
-    uses: anolishq/.github/.github/workflows/version-sync.yml@0199b6cc7cb73a02d58f75ec8ed763ac40e54dca # v2
+    uses: anolishq/.github/.github/workflows/version-sync.yml@7b20551d1532b9e4f1264c9e966fa6ebbf098d75 # v2
     with:
       python-version: '3.12'
       working-directory: '.'
