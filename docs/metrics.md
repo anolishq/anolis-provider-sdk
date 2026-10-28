@@ -20,7 +20,7 @@ they must not redefine reserved ones.
 ### Transport I/O counters
 
 | key | meaning |
-|---|---|
+| --- | --- |
 | `io_ok` | Operations that reached the transport and ultimately succeeded. |
 | `io_failed` | Operations that reached the transport and ultimately failed, either after the provider's retry budget was exhausted or on a failure the provider does not retry. |
 | `io_retried_attempts` | Every attempt beyond an operation's first — including attempts whose operation eventually succeeded. |
@@ -67,7 +67,7 @@ Providers whose devices carry a firmware command watchdog (BREAD
 keys, sourced from a live status query — never from cached provider state:
 
 | key | meaning |
-|---|---|
+| --- | --- |
 | `watchdog_armed` | `true`/`false` — whether the firmware watchdog is armed. |
 | `watchdog_timeout_ms` | Configured timeout in milliseconds. |
 | `watchdog_tripped` | `true`/`false` — whether the watchdog has expired since the last clear. Latched only on firmware that advertises the per-type `CLEAR_WATCHDOG_TRIP` capability; on other firmware the next valid command frame, `SET_WATCHDOG` included, clears it. |
@@ -89,7 +89,7 @@ Rules:
 ### Presence flags
 
 | key | meaning |
-|---|---|
+| --- | --- |
 | `missing` | The provider expected/configured this device but could not bring it up (bread; optional free-text `missing_detail` alongside). |
 | `excluded` | The device was excluded from operation after startup failures (ezo). |
 
@@ -105,7 +105,7 @@ Rules:
 ### Identity strings
 
 | key | meaning |
-|---|---|
+| --- | --- |
 | `firmware_version` | The firmware revision the device itself reports, as an opaque string (for example `1.0.0`). |
 
 Rules:

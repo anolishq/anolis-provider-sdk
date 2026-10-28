@@ -15,7 +15,7 @@ page: it implements every flag below on a current SDK release.
 calls for each request:
 
 | Member | Answers |
-|---|---|
+| --- | --- |
 | `metadata()` | Provider name, version and protocol version, sent in the Hello handshake |
 | `readiness()` | Which configured devices started and which failed, for WaitReady and health |
 | `list_device_ids()`, `has_device()`, `device_info()` | The device inventory |
@@ -59,7 +59,7 @@ The [executable profile](https://github.com/anolishq/anolis-protocol/blob/main/d
 defines the flags tools rely on:
 
 | Flag | Does |
-|---|---|
+| --- | --- |
 | `--config <path>` | Start serving with this config |
 | `--check-config <path>` | Validate the config and exit |
 | `--config-schema` | Print the config's JSON Schema envelope and exit |
