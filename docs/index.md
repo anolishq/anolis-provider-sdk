@@ -41,3 +41,8 @@ target_link_libraries(my_provider PRIVATE anolis::provider_sdk)
 The SDK is built from source as part of the provider, never installed as a
 prebuilt library. It also provides the ADPP protocol messages as the
 `anolis::adpp_proto` target.
+
+The provider's build supplies the SDK's dependencies: `find_package` must find
+Protobuf and Threads, and yaml-cpp too unless the config toolkit is turned off
+with `-DANOLIS_PROVIDER_SDK_ENABLE_CONFIG=OFF`. With vcpkg, list them in the
+provider's own manifest under its own baseline; the SDK does not bring one.
