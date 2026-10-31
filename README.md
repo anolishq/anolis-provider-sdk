@@ -57,6 +57,10 @@ FetchContent_MakeAvailable(anolis_provider_sdk)
 target_link_libraries(my_provider PRIVATE anolis::provider_sdk)
 ```
 
+The provider supplies Protobuf, Threads and, unless
+`ANOLIS_PROVIDER_SDK_ENABLE_CONFIG` is off, yaml-cpp, through its own vcpkg
+manifest and baseline. See [docs/index.md](docs/index.md#using-it).
+
 ## Building locally
 
 ```sh
