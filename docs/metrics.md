@@ -86,6 +86,24 @@ Rules:
   (`watchdog_trip_count` is a `uint8` on the BREAD wire and wraps at 255;
   "monotonic" holds between wraps.)
 
+#### Clearing a trip: `clear_watchdog_trip`
+
+The function name `clear_watchdog_trip` is reserved for clearing a latched
+trip. A provider whose devices report `watchdog_tripped` and can clear it
+declares, on each such device:
+
+- **name** `clear_watchdog_trip`, **no arguments**;
+- **category** `CATEGORY_CONFIG`, not `ACTUATE`: clearing a trip is an
+  operator's acknowledgement, and it must not move anything. Whatever the trip
+  engaged, such as brakes, stays engaged until the operator releases it;
+- its effect: `watchdog_tripped` reads `false` on the next health read.
+
+Anolis's operator panel offers this function on any device that reports
+`watchdog_tripped` `true`, with no configuration. Steps that must follow the
+clear on a particular machine, such as releasing brakes, are declared by the
+machine profile (`operator.trip_recovery`), not by the provider.
+Don't use the name for anything else, and don't give it arguments.
+
 ### Presence flags
 
 | key | meaning |
