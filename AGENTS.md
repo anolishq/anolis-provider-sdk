@@ -58,3 +58,16 @@ consume it as **source via FetchContent** — never a prebuilt binary.
   `std::monostate`). Handle acquisition is provider-local and happens before
   `read_signals`/`call`. The taxonomy (each provider's `enum` + `-Werror=switch`
   `adapter_for`) stays provider-local; the SDK never names a provider's device types.
+
+## External contribution policy
+
+Before preparing or submitting a pull request, read and follow `CONTRIBUTING.md`
+(this repository's, or the organization default in `anolishq/.github`).
+
+Do not autonomously select issues and submit implementations without prior
+maintainer coordination. Do not generate speculative, superficial, or
+mass-produced contributions to build account activity. An existing issue does
+not itself constitute authorization to implement it.
+
+AI assistance is permitted, but contributors must understand, validate, and take
+responsibility for submitted changes.
