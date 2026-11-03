@@ -13,6 +13,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   a provider can now be distributed under any Apache-2.0-compatible licence,
   proprietary included. The runtime and Workbench stay AGPL-3.0. Releases up to
   and including v0.4.0 remain AGPL-3.0-or-later. (#63)
+- anolis-protocol build pin 1.6.0 -> 1.10.0, the first release under
+  Apache-2.0, so the schema the SDK compiles carries the same licence as the
+  SDK. Between 1.6.0 and 1.10.0 the `.proto` files changed only in a comment,
+  so the generated code is unchanged.
 
 ## [0.4.0] — 2026-10-22
 

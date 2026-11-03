@@ -10,7 +10,7 @@ share, so a new provider is "implement the device seam, get the protocol for fre
 > **Status: v0.4.0 — the spine and device-model framework are lifted and
 > consumed by all three reference providers** (each pins its own SDK release
 > tarball; the SDK is the fleet's single declarant of the `anolis-protocol`
-> build pin, v1.6.0; each provider's CI pins its own `anolis-protocol[conformance]`
+> build pin, v1.10.0; each provider's CI pins its own `anolis-protocol[conformance]`
 > wheel). Extraction history: epic
 > [anolis-protocol#45](https://github.com/anolishq/anolis-protocol/issues/45).
 
