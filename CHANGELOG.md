@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-11-03
+
+0.5.0, not 0.4.1: the licence changes, though no API does.
+
 ### Changed
 
 - **Licence: Apache-2.0**, from AGPL-3.0-or-later. Providers link this SDK
@@ -225,7 +229,9 @@ not a placeholder API.
   triplets, `tsan.supp` / `valgrind.supp`, Renovate, `AGENTS.md`.
 - A proto smoke test proving the re-export links and round-trips a message.
 
-[Unreleased]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.1.5...v0.2.0
