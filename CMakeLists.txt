@@ -63,8 +63,8 @@ find_package(Threads REQUIRED)
 include(FetchContent)
 FetchContent_Declare(
     anolis_protocol
-    URL https://github.com/anolishq/anolis-protocol/releases/download/v1.6.0/anolis-protocol-1.6.0-source.tar.gz
-    URL_HASH SHA256=80b3db19d5249ae5f921a28873055c9a73e5579a3cab7eaa59bc75d39fedcec4
+    URL https://github.com/anolishq/anolis-protocol/releases/download/v1.10.0/anolis-protocol-1.10.0-source.tar.gz
+    URL_HASH SHA256=77c8baf8b423682e2f1fda771540a24ff0cb0843a3d7540607991f662218419a
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_MakeAvailable(anolis_protocol)
