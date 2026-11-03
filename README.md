@@ -74,4 +74,9 @@ resolves dependencies during CMake configure (`VCPKG_ROOT` must be set).
 
 ## License
 
-AGPL-3.0-or-later. See [LICENSE](LICENSE).
+Apache-2.0. See [LICENSE](LICENSE). A provider that links this SDK can be
+distributed under any licence compatible with Apache-2.0, proprietary included.
+
+Releases up to and including v0.4.0 were published under AGPL-3.0-or-later and
+remain available under it. The Anolis runtime and Workbench stay AGPL-3.0; a
+provider is a separate process, so their licence does not extend to it.

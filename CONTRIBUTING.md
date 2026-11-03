@@ -60,3 +60,8 @@ Automated contribution farming, mass-submitted PRs, and superficial changes
 intended primarily to build contribution history are not accepted. AI-assisted
 contributions are welcome when contributors understand, validate, and take
 responsibility for their work.
+
+## License
+
+Contributions are accepted under Apache-2.0, the licence in [LICENSE](LICENSE)
+(Apache-2.0 §5).
