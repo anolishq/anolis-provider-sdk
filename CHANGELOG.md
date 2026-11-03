@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Licence: Apache-2.0**, from AGPL-3.0-or-later. Providers link this SDK
+  statically, so its licence applied to every provider binary built with it;
+  a provider can now be distributed under any Apache-2.0-compatible licence,
+  proprietary included. The runtime and Workbench stay AGPL-3.0. Releases up to
+  and including v0.4.0 remain AGPL-3.0-or-later. (#63)
+
 ## [0.4.0] — 2026-10-22
 
 ### Added
