@@ -1,0 +1,8 @@
+# Config for the conformance harness and CI: two simulated heaters, no hardware.
+devices:
+  - id: heater0
+    label: Heater 0
+  - id: heater1
+    ambient_c: 22.5
+    max_rise_c: 30
+    rated_w: 60
