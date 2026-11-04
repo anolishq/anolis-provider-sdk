@@ -34,7 +34,8 @@ required, and its bounds or `allowed_values`, and check in `call` only what an
 `ArgSpec` cannot express.
 
 A function that declares results (`FunctionSpec.results`) returns them with
-`call_ok(results)`; the SDK adds them to the response alongside `accepted`.
+`call_ok(results)`, and the response carries exactly those. A call that returns
+no results gets the constant `accepted = true`.
 
 Inside `read` and `call`, each provider dispatches to a per-device-type
 adapter of its own. The SDK also offers an optional template for that table,

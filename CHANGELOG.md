@@ -18,10 +18,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `validate_call_args` (`call_validation.hpp`) is public for providers that
   validate elsewhere. (#65)
 - **Per-function call results.** `AdapterCallResult` gains `results`, the
-  function's declared results, which the call handler merges over its constant
-  `accepted = true`; `call_ok(results)` builds one. It defaults to empty, and a
+  function's declared results; `call_ok(results)` builds one. When a call
+  returns results, the response carries exactly those; when it returns none,
+  the constant `accepted = true` as before. `results` defaults to empty, and a
   three-element `{ok, code, message}` initializer still compiles warning-free,
   so existing providers need no change. (#60)
+- A call to a device the provider does not list is `CODE_NOT_FOUND` from the
+  SDK, as describe and read already were, before `ProviderRuntime::call` runs.
 
 ## [0.5.0] — 2026-11-03
 
