@@ -126,6 +126,17 @@ TEST(CallValidationTest, TheHandlerRejectsEachKindOfBadArgumentBeforeTheProvider
     EXPECT_EQ(rt.calls, 1);
 }
 
+TEST(CallValidationTest, ACallToAnUnknownDeviceIsNotFoundBeforeTheProviderSeesIt) {
+    AcceptingRuntime rt;
+    adpp::CallRequest req;
+    req.set_device_id("nope");
+    req.set_function_name("set_level");
+    adpp::Response resp;
+    sdk::handlers::handle_call(req, resp, rt);
+    EXPECT_EQ(resp.status().code(), adpp::Status::CODE_NOT_FOUND);
+    EXPECT_EQ(rt.calls, 0);
+}
+
 TEST(CallValidationTest, AFunctionTheDeviceDoesNotDeclareIsLeftToTheProvider) {
     AcceptingRuntime rt;
     EXPECT_EQ(call_code(rt, "undeclared", args_of({{"anything", sdk::make_bool_val(true)}})), adpp::Status::CODE_OK);
