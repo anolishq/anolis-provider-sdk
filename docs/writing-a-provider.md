@@ -27,6 +27,12 @@ calls for each request:
 `device_health()` and `provider_health()` are optional, with defaults that add
 nothing. They must not do device I/O.
 
+`call` sees only arguments that match the function's declared `ArgSpec`s: the
+SDK checks them first (semantics §8.3) and answers `CODE_INVALID_ARGUMENT` or
+`CODE_OUT_OF_RANGE` itself. So declare each argument's type, whether it is
+required, and its bounds or `allowed_values`, and check in `call` only what an
+`ArgSpec` cannot express.
+
 Inside `read` and `call`, each provider dispatches to a per-device-type
 adapter of its own. The SDK also offers an optional template for that table,
 `DeviceAdapter<HandleT>` in `device_adapter.hpp`, parameterised on the

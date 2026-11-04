@@ -135,6 +135,7 @@ add_library(anolis_provider_sdk STATIC
     src/anolis/provider_sdk/transport.cpp
     src/anolis/provider_sdk/logging.cpp
     src/anolis/provider_sdk/handlers.cpp
+    src/anolis/provider_sdk/call_validation.cpp
     src/anolis/provider_sdk/runtime.cpp
     src/anolis/provider_sdk/claims.cpp
     src/anolis/provider_sdk/host_check.cpp

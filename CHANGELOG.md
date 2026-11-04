@@ -6,6 +6,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Call arguments are validated against the declared spec** (semantics §8.3)
+  before `ProviderRuntime::call` runs, in the Python SDK's order: an undeclared
+  argument, a missing required one, a wrong type, a non-finite double or a value
+  outside `allowed_values` is `CODE_INVALID_ARGUMENT`; a value outside its
+  declared (inclusive) bounds is `CODE_OUT_OF_RANGE`. A provider's own checks
+  that the declared `ArgSpec` already expresses can go. A function the device
+  does not declare in `capabilities()` is passed to the provider as before.
+  `validate_call_args` (`call_validation.hpp`) is public for providers that
+  validate elsewhere. (#65)
+
 ## [0.5.0] — 2026-11-03
 
 0.5.0, not 0.4.1: the licence changes, though no API does.
