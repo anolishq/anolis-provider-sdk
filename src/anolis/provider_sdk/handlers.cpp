@@ -286,6 +286,10 @@ void handle_call(const adpp::CallRequest& request, adpp::Response& response, Pro
         set_status(response, adpp::Status::CODE_INVALID_ARGUMENT, "device_id is required");
         return;
     }
+    if (!runtime.has_device(request.device_id())) {
+        set_status(response, adpp::Status::CODE_NOT_FOUND, "unknown device_id: " + request.device_id());
+        return;
+    }
     if (request.function_id() == 0 && request.function_name().empty()) {
         set_status(response, adpp::Status::CODE_INVALID_ARGUMENT, "function_id or function_name is required");
         return;
@@ -307,18 +311,16 @@ void handle_call(const adpp::CallRequest& request, adpp::Response& response, Pro
     // §8.3: check the arguments against the function's declared spec before the
     // provider sees them. A function the device does not declare is left to the
     // provider, which answers NOT_FOUND as before.
-    if (runtime.has_device(request.device_id())) {
-        const adpp::CapabilitySet caps = runtime.capabilities(request.device_id());
-        for (const auto& spec : caps.functions()) {
-            if (spec.function_id() != resolved_function_id) {
-                continue;
-            }
-            if (const auto err = validate_call_args(spec, request.args())) {
-                set_status(response, err->code, err->message);
-                return;
-            }
-            break;
+    const adpp::CapabilitySet caps = runtime.capabilities(request.device_id());
+    for (const auto& spec : caps.functions()) {
+        if (spec.function_id() != resolved_function_id) {
+            continue;
         }
+        if (const auto err = validate_call_args(spec, request.args())) {
+            set_status(response, err->code, err->message);
+            return;
+        }
+        break;
     }
 
     // CallRequest.args is already a ValueMap (the wire type) — pass it through.
