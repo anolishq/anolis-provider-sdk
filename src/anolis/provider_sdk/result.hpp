@@ -12,6 +12,7 @@
 #include <google/protobuf/map.h>
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "protocol.pb.h"
@@ -36,18 +37,25 @@ struct AdapterReadResult {
     std::vector<adpp::SignalValue> values;
 };
 
-// Normalized result of one adapter function call (status only). An optional
-// per-function results payload is a tracked follow-up (anolis-protocol#57).
+// Normalized result of one adapter function call. On success, `results` carries
+// the function's declared results (FunctionSpec.results); the call handler
+// merges them over its constant `accepted = true`. Empty for a function that
+// declares none. The member initializer keeps three-element brace init
+// ({ok, code, message}) free of -Wmissing-field-initializers in providers.
 struct AdapterCallResult {
     bool ok = false;
     adpp::Status::Code error_code = adpp::Status::CODE_UNAVAILABLE;
     std::string error_message;
+    ValueMap results{};
 };
 
 // Call-result factories — the field-for-field fold of sim's `CallResult`
 // vocabulary (`ok`/`bad`/`nf`/`precond`/`out_of_range`) onto the neutral
 // `AdapterCallResult`. `ok` is implied by a non-error code.
-inline AdapterCallResult call_ok() { return {true, adpp::Status::CODE_OK, "ok"}; }
+inline AdapterCallResult call_ok() { return {true, adpp::Status::CODE_OK, "ok", {}}; }
+
+// Success with the function's declared results.
+inline AdapterCallResult call_ok(ValueMap results) { return {true, adpp::Status::CODE_OK, "ok", std::move(results)}; }
 
 inline AdapterCallResult call_invalid_argument(const std::string& message) {
     return {false, adpp::Status::CODE_INVALID_ARGUMENT, message};

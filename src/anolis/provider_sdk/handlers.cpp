@@ -330,9 +330,13 @@ void handle_call(const adpp::CallRequest& request, adpp::Response& response, Pro
 
     auto* out = response.mutable_call();
     out->set_device_id(request.device_id());
-    // §8: stamp the declared `accepted` result on success. A richer per-function
-    // results payload is the AdapterCallResult follow-up (anolis-protocol#57).
-    (*out->mutable_results())["accepted"] = make_bool_val(true);
+    // §8: stamp `accepted` on success, then merge the function's own results over
+    // it, so a provider that returns its declared results reports them.
+    auto& results = *out->mutable_results();
+    results["accepted"] = make_bool_val(true);
+    for (const auto& [name, value] : result.results) {
+        results[name] = value;
+    }
     set_status_ok(response);
 }
 

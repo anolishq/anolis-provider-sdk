@@ -248,6 +248,34 @@ TEST(DeviceHandlersTest, CallPolicyAndAcceptedShim) {
     }
 }
 
+TEST(DeviceHandlersTest, CallResultsAreMergedOverAccepted) {
+    class ResultsMock : public DeviceMock {
+    public:
+        sdk::ValueMap returned;
+        sdk::AdapterCallResult call(const std::string&, uint32_t, const sdk::ValueMap&) override {
+            return sdk::call_ok(returned);
+        }
+    };
+    ResultsMock rt;
+    adpp::CallRequest req;
+    req.set_device_id("temp");
+    req.set_function_id(1);
+
+    rt.returned["energy"] = sdk::make_double_val(500.0);
+    adpp::Response resp;
+    sdk::handlers::handle_call(req, resp, rt);
+    ASSERT_EQ(resp.status().code(), adpp::Status::CODE_OK);
+    ASSERT_EQ(resp.call().results().count("energy"), 1U);
+    EXPECT_DOUBLE_EQ(resp.call().results().at("energy").double_value(), 500.0);
+    EXPECT_TRUE(resp.call().results().at("accepted").bool_value());
+
+    // The provider's own value wins over the constant.
+    rt.returned["accepted"] = sdk::make_bool_val(false);
+    adpp::Response resp2;
+    sdk::handlers::handle_call(req, resp2, rt);
+    EXPECT_FALSE(resp2.call().results().at("accepted").bool_value());
+}
+
 TEST(DeviceHandlersTest, LiveDeviceNotInStartupReportStillGetsHealth) {
     // Regression (caught by sim conformance): a live device absent from the
     // startup report — e.g. a synthetic control channel like sim's chaos_control —

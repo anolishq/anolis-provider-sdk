@@ -17,6 +17,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   does not declare in `capabilities()` is passed to the provider as before.
   `validate_call_args` (`call_validation.hpp`) is public for providers that
   validate elsewhere. (#65)
+- **Per-function call results.** `AdapterCallResult` gains `results`, the
+  function's declared results, which the call handler merges over its constant
+  `accepted = true`; `call_ok(results)` builds one. It defaults to empty, and a
+  three-element `{ok, code, message}` initializer still compiles warning-free,
+  so existing providers need no change. (#60)
 
 ## [0.5.0] — 2026-11-03
 
