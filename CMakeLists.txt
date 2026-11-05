@@ -238,3 +238,9 @@ if(BUILD_TESTING AND ANOLIS_PROVIDER_SDK_BUILD_TESTS)
     find_package(GTest CONFIG REQUIRED)
     add_subdirectory(tests/unit)
 endif()
+
+# The reference provider, built with the SDK's own tests (never for a consumer):
+# CI runs the conformance harness against it.
+if(ANOLIS_PROVIDER_SDK_BUILD_TESTS AND ANOLIS_PROVIDER_SDK_ENABLE_CONFIG)
+    add_subdirectory(examples/reference)
+endif()

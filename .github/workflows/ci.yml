@@ -105,6 +105,35 @@ jobs:
         working-directory: anolis-provider-sdk
         run: ctest --preset ci-linux-release
 
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.13"
+
+      - name: Pull anolis-protocol[conformance]
+        run: python -m pip install "anolis-protocol[conformance] @ https://github.com/anolishq/anolis-protocol/releases/download/v1.10.0/anolis_protocol-1.10.0-py3-none-any.whl"
+
+      # The reference provider under the harness: an SDK change that breaks the
+      # protocol fails here, not later in a provider's CI. No failures; the only
+      # skips allowed are the two deadline tests, until #71 lands.
+      - name: Conformance against the reference provider
+        working-directory: anolis-provider-sdk
+        run: |
+          anolis-adpp-conformance \
+            --provider-bin build/ci-linux-release/examples/reference/anolis-provider-reference \
+            --provider-config config/conformance.yaml \
+            --provider-profile config/conformance.toml \
+            --junitxml=conformance.xml -ra
+          python3 - conformance.xml <<'EOF'
+          import sys
+          import xml.etree.ElementTree as ET
+          expected = {"test_l2_expired_deadline_exceeded", "test_l2_malformed_deadline_is_invalid_argument"}
+          skipped = {c.get("name") for c in ET.parse(sys.argv[1]).iter("testcase") if c.find("skipped") is not None}
+          unexpected = skipped - expected
+          if unexpected:
+              sys.exit(f"unexpected skips: {sorted(unexpected)}")
+          print(f"skips: {sorted(skipped)} (allowed until #71)")
+          EOF
+
   build-and-test-windows:
     name: Windows Build and Test
     needs: [changes]

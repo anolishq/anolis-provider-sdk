@@ -25,6 +25,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   so existing providers need no change. (#60)
 - A call to a device the provider does not list is `CODE_NOT_FOUND` from the
   SDK, as describe and read already were, before `ProviderRuntime::call` runs.
+- **A reference provider, `anolis-provider-reference`** (`examples/reference/`):
+  simulated heaters, the same device as the Python SDK's reference provider and
+  the provider templates. CI runs the anolis-protocol 1.10.0 conformance harness
+  against it on every change; the only skips allowed are the two §8.4 deadline
+  tests, until the SDK supports deadlines (#71). It is built only when the SDK
+  is the top-level project, never for a consumer. (#64)
 
 ## [0.5.0] — 2026-11-03
 
