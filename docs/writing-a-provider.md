@@ -6,8 +6,12 @@ SDK handles that loop. A provider built on the SDK supplies three things: an
 implementation of `ProviderRuntime`, a `main()` that hands control to
 `run_loop`, and the command-line flags the executable profile requires.
 
-anolis-provider-ezo is the smallest complete example to read alongside this
-page: it implements every flag below on a current SDK release.
+The quickest start is the
+[template](https://github.com/anolishq/anolis-provider-template-cpp): a working
+provider with its build, CI, release and the conformance harness already set
+up. Its `src/provider.cpp`, the same as this repository's reference provider
+(`examples/reference/`), is the smallest complete example to read alongside
+this page: it implements every flag below.
 
 ## 1. Implement `ProviderRuntime`
 
