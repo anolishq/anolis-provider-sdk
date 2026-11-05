@@ -64,24 +64,57 @@ protocol-level outcome belongs in separate keys (e.g. ezo's
 
 Providers whose devices carry a firmware command watchdog (BREAD
 `SET_WATCHDOG`/`GET_WATCHDOG` vocabulary; bread today) report it under these
-keys, sourced from a live status query — never from cached provider state:
+keys. The values are the provider's last reading of the device's own status
+reply (`GET_WATCHDOG`), taken on the provider's I/O path and cached. The
+health hook reports that cached reading and its age, and does no device I/O
+itself (`ProviderRuntime::device_health` in `runtime.hpp`).
 
 | key | meaning |
 | --- | --- |
 | `watchdog_armed` | `true`/`false` — whether the firmware watchdog is armed. |
-| `watchdog_timeout_ms` | Configured timeout in milliseconds. |
+| `watchdog_timeout_ms` | The timeout the device reports it is configured with, in milliseconds. |
 | `watchdog_tripped` | `true`/`false` — whether the watchdog has expired since the last clear. Latched only on firmware that advertises the per-type `CLEAR_WATCHDOG_TRIP` capability; on other firmware the next valid command frame, `SET_WATCHDOG` included, clears it. |
 | `watchdog_trip_count` | Cumulative trips since device boot. |
+| `watchdog_status_age_ms` | Milliseconds from the moment the provider received the status reply the keys above report to the `device_health` call that reports it. |
 
 Rules:
 
+- **Cached, not live.** The SDK calls `device_health` once per device, one
+  after another, while it builds a single GetHealth or
+  ListDevices(include_health) response. A status query there would add one
+  bus round trip per watchdog device to that response, and on a dead bus each
+  one blocks until the transport gives up. So the provider reads the status
+  where it already does device I/O, stores the reading, and `device_health`
+  reports the stored copy. How often the provider refreshes the reading is
+  its own choice; `watchdog_status_age_ms` reports the result.
+- **The status read is ordinary device I/O.** On the I/O path, a status read
+  counts in the `io_*` counters like any other transport operation, and a
+  successful one is a genuine contact for `last_seen`. A health read itself
+  changes neither.
+- **What the device said, not what the provider expects.** The values come
+  from the device's status reply. Never derive them from configuration or
+  from a command the provider sent: a `SET_WATCHDOG` that succeeded does not
+  make `watchdog_armed` `true` until a status reply says so.
+- **One reading, with its age.** The four status keys come from one status
+  reply, and `watchdog_status_age_ms` is that reply's age. The five keys are
+  present together or not at all. The age MUST be measured on a monotonic
+  clock, so that a wall-clock step (NTP setting the time on a host without a
+  real-time clock, say) cannot make a reading look fresher or older than it
+  is.
+- **A failed refresh keeps the last reading.** When a later status read fails,
+  the provider keeps reporting the last successful reading, and
+  `watchdog_status_age_ms` keeps growing. A failed read therefore no longer
+  removes the keys: the age is how a reader tells a current reading from an
+  old one, and how old is too old is the reader's decision.
 - **Omit, don't fabricate.** When the device lacks the capability, the
-  watchdog is not configured, or the live query fails, the keys are absent —
-  a reader must treat absence as "unknown", not "disarmed".
+  watchdog is not configured, or the provider has no successful reading yet,
+  the keys are absent — a reader must treat absence as "unknown", not
+  "disarmed".
 - Booleans are the strings `true`/`false`; counters follow the same
   cumulative/monotonic convention as the I/O counters, except the reset point
   is the *device* (firmware boot), not the provider process.
-- These keys are consumed downstream as typed fields (anolis
+  `watchdog_status_age_ms` is a non-negative base-10 integer.
+- The four status keys are consumed downstream as typed fields (anolis
   `telemetry-health-timeseries` contract), so their formats are load-bearing.
   (`watchdog_trip_count` is a `uint8` on the BREAD wire and wraps at 255;
   "monotonic" holds between wraps.)
@@ -97,6 +130,13 @@ declares, on each such device:
   operator's acknowledgement, and it must not move anything. Whatever the trip
   engaged, such as brakes, stays engaged until the operator releases it;
 - its effect: `watchdog_tripped` reads `false` on the next health read.
+  Health reports the cached reading, so before the call returns the provider
+  reads the status back on its I/O path and updates the cache. It does not
+  record `false` merely because the clear succeeded. If the read-back fails,
+  the call fails and the cache keeps its last reading. If the read-back
+  succeeds but still reports the trip, the call fails and the cache takes
+  that reading. Either way the clear may already have reached the device;
+  since a clear moves nothing, a caller can safely retry it.
 
 Anolis's operator panel offers this function on any device that reports
 `watchdog_tripped` `true`, with no configuration. Steps that must follow the

@@ -98,8 +98,14 @@ public:
     // list_devices(include_health) and get_health — for BOTH live-inventory ids
     // AND startup-failed/missing ids (which have no live handle, so an override
     // MUST tolerate an unknown id and return a default-constructed value). MUST be
-    // in-process only (no live device I/O on this path) and SHOULD take at most one
-    // internal snapshot so the returned metrics + last_seen are one atomic view.
+    // in-process only (no live device I/O on this path): the calls run one after
+    // another while a single response is built, so I/O here would cost once per
+    // device before that response goes out. Hardware status that needs a device
+    // read, such as a firmware watchdog's, is read on the provider's own I/O path
+    // and cached; this hook reports the cached reading, with its age where the
+    // metrics vocabulary defines one (docs/metrics.md, Command-watchdog state).
+    // SHOULD take at most one internal snapshot so the returned metrics +
+    // last_seen are one atomic view.
     virtual DeviceHealthExtra device_health(const std::string& /*device_id*/) const { return {}; }
 
     // Provider-level health enrichment (ezo#88). Defaulted so existing providers
