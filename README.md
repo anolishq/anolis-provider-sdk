@@ -42,6 +42,12 @@ i2c bus executor, each provider's device taxonomy) stay in the provider.
 
 ## Consuming it
 
+To start a provider, use the template:
+[anolis-provider-template-cpp](https://github.com/anolishq/anolis-provider-template-cpp)
+is a working provider on this SDK (simulated heaters) with the build below, CI
+on x86_64 and arm64, a release workflow, the conformance harness and a rename
+script. Click **Use this template**, then run `scripts/rename.sh <kind>`.
+
 The SDK is consumed **as source**, via CMake `FetchContent` — never as a prebuilt
 binary, so sanitizer / static / arm64 builds rebuild the dependency tree in-tree
 with the consumer's flags:
