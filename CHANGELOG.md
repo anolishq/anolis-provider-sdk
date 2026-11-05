@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-11-04
+
 ### Added
 
 - **Call arguments are validated against the declared spec** (semantics §8.3)
@@ -255,7 +257,8 @@ not a placeholder API.
   triplets, `tsan.supp` / `valgrind.supp`, Renovate, `AGENTS.md`.
 - A proto smoke test proving the re-export links and round-trips a message.
 
-[Unreleased]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.3.0...v0.3.1
