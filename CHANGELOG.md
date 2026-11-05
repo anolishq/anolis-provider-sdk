@@ -6,6 +6,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Watchdog health metrics come from a cached reading.** `docs/metrics.md`
+  required the `watchdog_*` keys to come from a live status query, which the
+  in-process-only contract of `ProviderRuntime::device_health` (`runtime.hpp`)
+  forbids, so no provider could meet both. The contract now keeps the hook
+  in-process: the provider reads the watchdog status on its own I/O path,
+  caches it, and `device_health` reports the cached reading. A new reserved
+  key, `watchdog_status_age_ms`, gives that reading's age and is present
+  whenever the other watchdog keys are. After `clear_watchdog_trip` the
+  provider reads the status back before the call returns, so the next health
+  read reflects the clear. Documentation only; no API changes.
+  (#62, anolishq/anolis-provider-bread#199)
+
 ## [0.6.0] — 2026-11-04
 
 ### Added
