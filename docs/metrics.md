@@ -75,7 +75,7 @@ itself (`ProviderRuntime::device_health` in `runtime.hpp`).
 | `watchdog_timeout_ms` | The timeout the device reports it is configured with, in milliseconds. |
 | `watchdog_tripped` | `true`/`false` — whether the watchdog has expired since the last clear. Latched only on firmware that advertises the per-type `CLEAR_WATCHDOG_TRIP` capability; on other firmware the next valid command frame, `SET_WATCHDOG` included, clears it. |
 | `watchdog_trip_count` | Cumulative trips since device boot. |
-| `watchdog_status_age_ms` | Milliseconds from the moment the provider received the status reply the keys above report to the moment it built this health response. |
+| `watchdog_status_age_ms` | Milliseconds from the moment the provider received the status reply the keys above report to the `device_health` call that reports it. |
 
 Rules:
 
@@ -90,16 +90,17 @@ Rules:
   from the device's status reply. Never derive them from configuration or
   from a command the provider sent: a `SET_WATCHDOG` that succeeded does not
   make `watchdog_armed` `true` until a status reply says so.
-- **One reading, with its age.** The five keys describe the same reading:
-  whenever the status keys are present, `watchdog_status_age_ms` is present
-  too. Measure the age on a monotonic clock, so that a wall-clock step (NTP
-  setting the time on a host without a real-time clock, say) cannot make a
-  reading look fresher or older than it is.
+- **One reading, with its age.** The four status keys come from one status
+  reply, and `watchdog_status_age_ms` is that reply's age. The five keys are
+  present together or not at all. The age MUST be measured on a monotonic
+  clock, so that a wall-clock step (NTP setting the time on a host without a
+  real-time clock, say) cannot make a reading look fresher or older than it
+  is.
 - **A failed refresh keeps the last reading.** When a later status read fails,
   the provider keeps reporting the last successful reading, and
-  `watchdog_status_age_ms` keeps growing. The age is how a reader tells a
-  current reading from an old one; how old is too old is the reader's
-  decision.
+  `watchdog_status_age_ms` keeps growing. A failed read therefore no longer
+  removes the keys: the age is how a reader tells a current reading from an
+  old one, and how old is too old is the reader's decision.
 - **Omit, don't fabricate.** When the device lacks the capability, the
   watchdog is not configured, or the provider has no successful reading yet,
   the keys are absent — a reader must treat absence as "unknown", not
@@ -126,7 +127,8 @@ declares, on each such device:
 - its effect: `watchdog_tripped` reads `false` on the next health read.
   Health reports the cached reading, so before the call returns the provider
   reads the status back on its I/O path and updates the cache. It does not
-  record `false` merely because the clear succeeded.
+  record `false` merely because the clear succeeded. If the read-back fails,
+  the call fails and the cache keeps its last reading.
 
 Anolis's operator panel offers this function on any device that reports
 `watchdog_tripped` `true`, with no configuration. Steps that must follow the

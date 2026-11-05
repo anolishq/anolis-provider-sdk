@@ -15,9 +15,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   in-process: the provider reads the watchdog status on its own I/O path,
   caches it, and `device_health` reports the cached reading. A new reserved
   key, `watchdog_status_age_ms`, gives that reading's age and is present
-  whenever the other watchdog keys are. After `clear_watchdog_trip` the
-  provider reads the status back before the call returns, so the next health
-  read reflects the clear. Documentation only; no API changes.
+  whenever the other watchdog keys are, measured on a monotonic clock. When
+  a later status read fails, the provider keeps reporting the last successful
+  reading and its age keeps growing; before, a failed query left the keys
+  absent. After `clear_watchdog_trip` the provider reads the status back
+  before the call returns, so the next health read reflects the clear; if that
+  read fails, so does the call. Documentation only; no API changes.
   (#62, anolishq/anolis-provider-bread#199)
 
 ## [0.6.0] — 2026-11-04

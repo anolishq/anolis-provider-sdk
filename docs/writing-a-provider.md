@@ -31,8 +31,8 @@ calls for each request:
 `device_health()` and `provider_health()` are optional, with defaults that add
 nothing. They must not do device I/O. Status that needs a device read, such as
 a firmware watchdog's, is read where the provider already does I/O and cached,
-and health reports the cached reading with its age; the
-[metrics vocabulary](./metrics.md#command-watchdog-state) has the keys.
+and health reports the cached reading, with its age where the
+[metrics vocabulary](./metrics.md#command-watchdog-state) defines one.
 
 `call` sees only arguments that match the function's declared `ArgSpec`s: the
 SDK checks them first (semantics §8.3) and answers `CODE_INVALID_ARGUMENT` or

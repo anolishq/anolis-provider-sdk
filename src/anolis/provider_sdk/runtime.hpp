@@ -102,9 +102,10 @@ public:
     // another while a single response is built, so I/O here would cost once per
     // device before that response goes out. Hardware status that needs a device
     // read, such as a firmware watchdog's, is read on the provider's own I/O path
-    // and cached; this hook reports the cached reading with its age
-    // (docs/metrics.md, Command-watchdog state). SHOULD take at most one internal
-    // snapshot so the returned metrics + last_seen are one atomic view.
+    // and cached; this hook reports the cached reading, with its age where the
+    // metrics vocabulary defines one (docs/metrics.md, Command-watchdog state).
+    // SHOULD take at most one internal snapshot so the returned metrics +
+    // last_seen are one atomic view.
     virtual DeviceHealthExtra device_health(const std::string& /*device_id*/) const { return {}; }
 
     // Provider-level health enrichment (ezo#88). Defaulted so existing providers
