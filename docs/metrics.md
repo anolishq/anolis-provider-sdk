@@ -85,7 +85,12 @@ Rules:
   bus round trip per watchdog device to that response, and on a dead bus each
   one blocks until the transport gives up. So the provider reads the status
   where it already does device I/O, stores the reading, and `device_health`
-  reports the stored copy.
+  reports the stored copy. How often the provider refreshes the reading is
+  its own choice; `watchdog_status_age_ms` reports the result.
+- **The status read is ordinary device I/O.** On the I/O path, a status read
+  counts in the `io_*` counters like any other transport operation, and a
+  successful one is a genuine contact for `last_seen`. A health read itself
+  changes neither.
 - **What the device said, not what the provider expects.** The values come
   from the device's status reply. Never derive them from configuration or
   from a command the provider sent: a `SET_WATCHDOG` that succeeded does not
@@ -128,7 +133,10 @@ declares, on each such device:
   Health reports the cached reading, so before the call returns the provider
   reads the status back on its I/O path and updates the cache. It does not
   record `false` merely because the clear succeeded. If the read-back fails,
-  the call fails and the cache keeps its last reading.
+  the call fails and the cache keeps its last reading. If the read-back
+  succeeds but still reports the trip, the call fails and the cache takes
+  that reading. Either way the clear may already have reached the device;
+  since a clear moves nothing, a caller can safely retry it.
 
 Anolis's operator panel offers this function on any device that reports
 `watchdog_tripped` `true`, with no configuration. Steps that must follow the

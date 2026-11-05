@@ -20,8 +20,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   reading and its age keeps growing; before, a failed query left the keys
   absent. After `clear_watchdog_trip` the provider reads the status back
   before the call returns, so the next health read reflects the clear; if that
-  read fails, so does the call. Documentation only; no API changes.
-  (#62, anolishq/anolis-provider-bread#199)
+  read fails or still shows the trip, so does the call. No SDK code or API
+  changes, but the meaning of the watchdog keys on the wire changes: consumers
+  that read `watchdog_armed` or `watchdog_tripped` as current must now check
+  `watchdog_status_age_ms`. Consumer follow-ups: anolishq/anolis#732,
+  anolishq/anolis-workbench#809. (#62, anolishq/anolis-provider-bread#199)
 
 ## [0.6.0] — 2026-11-04
 
