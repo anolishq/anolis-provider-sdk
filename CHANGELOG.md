@@ -6,6 +6,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Call deadlines** (semantics §8.4). Hello advertises
+  `supports_deadlines = "true"`, and `handle_call` checks
+  `CallRequest.deadline` (an absolute UTC time, compared with the wall clock)
+  once the request is otherwise valid: a deadline outside the valid
+  `google.protobuf.Timestamp` range is `CODE_INVALID_ARGUMENT`, and one already
+  reached is `CODE_DEADLINE_EXCEEDED`, in both cases before
+  `ProviderRuntime::call` runs. The SDK does not interrupt a running call; if
+  the deadline passes while it runs, the response is `CODE_DEADLINE_EXCEEDED`
+  with `side_effects = possible` in the status details and no results. An
+  error the call returns is sent unchanged. This matches the Python SDK. Every
+  provider on this release advertises deadline support with no code change; a
+  call without a deadline behaves as before. The reference provider's
+  conformance lane now runs the two §8.4 tests and allows no skips. (#71)
+
 ### Changed
 
 - **Watchdog health metrics come from a cached reading.** `docs/metrics.md`

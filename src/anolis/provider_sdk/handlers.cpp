@@ -1,6 +1,8 @@
 #include "anolis/provider_sdk/handlers.hpp"
 
+#include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -19,6 +21,33 @@ void set_status(adpp::Response& response, adpp::Status::Code code, const std::st
 }
 
 void set_status_ok(adpp::Response& response) { set_status(response, adpp::Status::CODE_OK, "ok"); }
+
+// §8.4 deadlines. A deadline is a google.protobuf.Timestamp, an absolute UTC
+// time, compared against the wall clock as the Python SDK does. A valid
+// Timestamp lies in 0001-01-01T00:00:00Z ..= 9999-12-31T23:59:59.999999999Z.
+constexpr int64_t kMinTimestampSeconds = -62135596800;
+constexpr int64_t kMaxTimestampSeconds = 253402300799;
+constexpr int32_t kMaxTimestampNanos = 999'999'999;
+
+bool is_valid_timestamp(const google::protobuf::Timestamp& ts) {
+    return ts.seconds() >= kMinTimestampSeconds && ts.seconds() <= kMaxTimestampSeconds && ts.nanos() >= 0 &&
+           ts.nanos() <= kMaxTimestampNanos;
+}
+
+// -1, 0 or 1 as the wall clock now is before, at or after `deadline`.
+int compare_now_to(const google::protobuf::Timestamp& deadline) {
+    const auto since_epoch = std::chrono::system_clock::now().time_since_epoch();
+    const auto secs = std::chrono::floor<std::chrono::seconds>(since_epoch);
+    const int64_t now_s = secs.count();
+    const int64_t now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(since_epoch - secs).count();
+    if (now_s != deadline.seconds()) {
+        return now_s < deadline.seconds() ? -1 : 1;
+    }
+    if (now_ns != deadline.nanos()) {
+        return now_ns < deadline.nanos() ? -1 : 1;
+    }
+    return 0;
+}
 
 // Provider health derived from the readiness snapshot: DEGRADED if any configured
 // device failed to initialize, else OK. (Lifted from sim's make_provider_health;
@@ -155,6 +184,7 @@ void handle_hello(const adpp::HelloRequest& request, adpp::Response& response, c
     auto& md = *hello->mutable_metadata();
     md["transport"] = "stdio+uint32_le";
     md["max_frame_bytes"] = std::to_string(transport::kMaxFrameBytes);
+    md["supports_deadlines"] = "true";  // §8.4, enforced in handle_call
     for (const auto& [key, value] : meta.hello_extra) {
         md[key] = value;
     }
@@ -323,10 +353,36 @@ void handle_call(const adpp::CallRequest& request, adpp::Response& response, Pro
         break;
     }
 
+    // §8.4, once the request is otherwise valid (the Python SDK's order): a
+    // malformed deadline is INVALID_ARGUMENT, and one already reached is
+    // DEADLINE_EXCEEDED without calling the provider.
+    const bool has_deadline = request.has_deadline();
+    if (has_deadline) {
+        if (!is_valid_timestamp(request.deadline())) {
+            set_status(response, adpp::Status::CODE_INVALID_ARGUMENT, "deadline is not a valid timestamp");
+            return;
+        }
+        if (compare_now_to(request.deadline()) >= 0) {
+            set_status(response, adpp::Status::CODE_DEADLINE_EXCEEDED,
+                       "deadline expired before the call started; nothing was done");
+            return;
+        }
+    }
+
     // CallRequest.args is already a ValueMap (the wire type) — pass it through.
     const AdapterCallResult result = runtime.call(request.device_id(), resolved_function_id, request.args());
     if (!result.ok) {
         set_status(response, result.error_code, result.error_message);
+        return;
+    }
+
+    // §8.4: the SDK does not interrupt a running call. If the deadline passed
+    // while it ran, the call completed, so answer DEADLINE_EXCEEDED, say its
+    // effects may have happened, and send no results.
+    if (has_deadline && compare_now_to(request.deadline()) > 0) {
+        set_status(response, adpp::Status::CODE_DEADLINE_EXCEEDED,
+                   "deadline expired while the call ran; it completed, so its effects may have happened");
+        (*response.mutable_status()->mutable_details())["side_effects"] = "possible";
         return;
     }
 
