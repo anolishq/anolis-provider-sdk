@@ -42,7 +42,12 @@
 //
 // Two providers collide when their key sets share a key. For absolute paths,
 // publishing both keys adds no false collision: an equal configured string, or
-// an equal resolved path, names the same node. Aliases of one adapter are caught when both
+// an equal resolved path, names the same node. That claim covers absolute
+// paths only: a relative path that does not fully resolve keeps a relative
+// key, so two providers in different working directories can now share one
+// (`x/../i2c-1` in one, with `x` missing, and `i2c-1` in the other, with no
+// such node, both publish `i2c:i2c-1:...`), a collision earlier releases did
+// not report. Aliases of one adapter are caught when both
 // providers publish claim_keys; a provider on an older SDK publishes only (1),
 // so an alias it uses is caught only if it equals the other's (1) or (2).
 //

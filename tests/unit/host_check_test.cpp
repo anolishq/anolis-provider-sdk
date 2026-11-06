@@ -207,6 +207,15 @@ TEST(I2cClaimKey, AMissingNodeGetsItsLexicalForm) {
               "i2c:/nonexistent-anolis-sdk-test/x/i2c-9:0x0a");
 }
 
+TEST(I2cClaimKey, UnresolvedRelativePathsCanShareAKey) {
+    // Documented in claims.hpp: relative keys do not record the working
+    // directory, so these two meet on `i2c:<name>:0x63` wherever they run.
+    const std::string name = "anolis-sdk-no-such-node-i2c-1";
+    const auto spelled = sdk::i2c::claim_keys("anolis-sdk-no-such-dir/../" + name, 0x63);
+    EXPECT_EQ(spelled.back(), "i2c:" + name + ":0x63");
+    EXPECT_TRUE(collide(new_sdk_device("anolis-sdk-no-such-dir/../" + name, 0x63), old_sdk_device(name, 0x63)));
+}
+
 TEST(I2cClaimKey, SchemePathsAreLeftAlone) {
     // One key, exactly as configured, for any scheme (not only mock://).
     for (const char* path : {"mock://bench", "mock://bench//./x/", "tcp://bridge//./x/"}) {
