@@ -72,9 +72,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   is. `runtime.hpp` documents the exit codes against the framed-stdio
   profile: 0/2/3 as it defines them, plus 5 for a failed write to standard
   output, which the profile does not list. (#50)
-
-### Fixed
-
 - **I2C claims catch two paths to one adapter: new `i2c::claim_keys`.** The
   key `i2c::claim_key` builds uses the configured `bus_path` as given, so a
   udev symlink to `/dev/i2c-1`, `/dev//i2c-1` or `/dev/./i2c-1` each gave a
