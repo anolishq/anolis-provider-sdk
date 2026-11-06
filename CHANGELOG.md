@@ -26,6 +26,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `watchdog_status_age_ms`. Consumer follow-ups: anolishq/anolis#732,
   anolishq/anolis-workbench#809. (#62, anolishq/anolis-provider-bread#199)
 
+### Fixed
+
+- **`i2c::claim_key` gives one key per adapter, however its path is spelled.**
+  The key used the configured `bus_path` as given, so a udev symlink to
+  `/dev/i2c-1`, `/dev//i2c-1` or `/dev/./i2c-1` each gave a different key and
+  the runtime's `anolis.claim` uniqueness check let two providers drive the
+  same address. The bus path is now resolved as realpath(3) would when the key
+  is built: symlinks, `.` and `..` segments and repeated or trailing
+  separators collapse onto the node. A node that does not exist yet keeps its
+  lexically normal form, with any existing parent directory resolved, so an
+  alias of a missing node is caught only if it normalises to the same string.
+  `mock://` and other scheme paths are unchanged, and a path that resolves to
+  a name containing whitespace is rejected. On Windows, which has no i2c-dev,
+  only the lexical normalisation applies. A provider configured with a
+  symlink now publishes the target's path in its claim. The runtime compares
+  keys as before; a collision is seen only when each provider involved builds
+  its key with this release or later. (#47)
+
 ## [0.6.0] — 2026-11-04
 
 ### Added
