@@ -291,3 +291,97 @@ TEST(SpineTest, MalformedFrameReturnsParseError) {
 
     EXPECT_EQ(sdk::run_loop(in, out, rt), 3);  // parse error
 }
+
+// #50: a response over the 1 MiB frame cap.
+
+namespace {
+
+std::string serialized(const adpp::Request& req) {
+    std::string bytes;
+    EXPECT_TRUE(req.SerializeToString(&bytes));
+    return bytes;
+}
+
+// Every response frame fits the cap and is not OK/UNSPECIFIED where expected.
+void expect_error_frame(const adpp::Response& r, uint64_t request_id) {
+    EXPECT_EQ(r.request_id(), request_id);
+    EXPECT_NE(r.status().code(), adpp::Status::CODE_OK);
+    EXPECT_NE(r.status().code(), adpp::Status::CODE_UNSPECIFIED);
+    EXPECT_LE(r.ByteSizeLong(), sdk::transport::kMaxFrameBytes);
+}
+
+// device_info() carries a label too large for any one frame, so a ListDevices
+// answer cannot fit however the handler phrases it.
+class HugeDeviceRuntime : public MockRuntime {
+public:
+    adpp::Device device_info(const std::string& id) const override {
+        adpp::Device d;
+        d.set_device_id(id);
+        d.set_label(std::string(sdk::transport::kMaxFrameBytes, 'L'));
+        return d;
+    }
+};
+
+}  // namespace
+
+TEST(SpineTest, SubCapRequestWithAnOverCapAnswerGetsAnErrorAndTheLoopContinues) {
+    // The issue's repro: DescribeDevice with an unknown device_id of 1048560
+    // bytes. The request is under the cap; the NOT_FOUND message echoing it
+    // was not, and the provider exited 5 without answering.
+    MockRuntime rt;
+    std::stringstream in(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream out(std::ios::in | std::ios::out | std::ios::binary);
+    push_request(in, hello_request());
+    adpp::Request describe;
+    describe.set_request_id(2);
+    describe.mutable_describe_device()->set_device_id(std::string(1048560, 'x'));
+    ASSERT_LT(serialized(describe).size(), sdk::transport::kMaxFrameBytes);
+    push_request(in, describe);
+    adpp::Request list;
+    list.set_request_id(3);
+    list.mutable_list_devices();
+    push_request(in, list);
+
+    EXPECT_EQ(sdk::run_loop(in, out, rt), 0);
+    const auto responses = drain_responses(out);
+    ASSERT_EQ(responses.size(), 3u);
+    expect_error_frame(responses[1], 2);
+    EXPECT_EQ(responses[1].status().code(), adpp::Status::CODE_NOT_FOUND) << responses[1].status().message().size();
+    EXPECT_EQ(responses[2].request_id(), 3u);
+    EXPECT_EQ(responses[2].status().code(), adpp::Status::CODE_OK);
+}
+
+TEST(SpineTest, AnOverCapResponseIsReplacedByResourceExhausted) {
+    // Whatever produces it (here a provider's own device_info), a response over
+    // the cap is answered with a small error for the same request_id.
+    HugeDeviceRuntime rt;
+    std::stringstream in(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream out(std::ios::in | std::ios::out | std::ios::binary);
+    push_request(in, hello_request());
+    adpp::Request list;
+    list.set_request_id(41);
+    list.mutable_list_devices();
+    push_request(in, list);
+    adpp::Request health;
+    health.set_request_id(42);
+    health.mutable_get_health();
+    push_request(in, health);
+
+    EXPECT_EQ(sdk::run_loop(in, out, rt), 0);
+    const auto responses = drain_responses(out);
+    ASSERT_EQ(responses.size(), 3u);
+    expect_error_frame(responses[1], 41);
+    EXPECT_EQ(responses[1].status().code(), adpp::Status::CODE_RESOURCE_EXHAUSTED);
+    EXPECT_FALSE(responses[1].has_list_devices());
+    EXPECT_EQ(responses[2].request_id(), 42u);
+    EXPECT_EQ(responses[2].status().code(), adpp::Status::CODE_OK);
+}
+
+TEST(SpineTest, AFailedWriteIsExitFive) {
+    // Exit 5 stays for a real output-stream failure.
+    MockRuntime rt;
+    std::stringstream in(std::ios::in | std::ios::out | std::ios::binary);
+    push_request(in, hello_request());
+    std::ostream broken(nullptr);  // no buffer: every write sets badbit
+    EXPECT_EQ(sdk::run_loop(in, broken, rt), 5);
+}

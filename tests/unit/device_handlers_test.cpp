@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -676,4 +677,113 @@ TEST(DeviceHandlersTest, ProviderStateOverrideEscalatesToDegraded) {
     sdk::handlers::handle_get_health(req, resp, rt);
     EXPECT_EQ(resp.get_health().provider().state(), adpp::ProviderHealth::STATE_DEGRADED);
     EXPECT_EQ(resp.get_health().provider().message(), "i2c executor stopped");
+}
+
+//=============================================================================
+// Request fields echoed in error messages are bounded (#50)
+//=============================================================================
+
+namespace {
+
+// Strict UTF-8 check: protobuf string fields must hold valid UTF-8, so a
+// truncated echo must not split a character.
+bool is_valid_utf8(const std::string& s) {
+    std::size_t i = 0;
+    while (i < s.size()) {
+        const auto c = static_cast<unsigned char>(s[i]);
+        std::size_t len = 0;
+        if (c < 0x80U) {
+            len = 1;
+        } else if ((c & 0xE0U) == 0xC0U) {
+            len = 2;
+        } else if ((c & 0xF0U) == 0xE0U) {
+            len = 3;
+        } else if ((c & 0xF8U) == 0xF0U) {
+            len = 4;
+        } else {
+            return false;
+        }
+        if (i + len > s.size()) {
+            return false;
+        }
+        for (std::size_t k = 1; k < len; ++k) {
+            if ((static_cast<unsigned char>(s[i + k]) & 0xC0U) != 0x80U) {
+                return false;
+            }
+        }
+        i += len;
+    }
+    return true;
+}
+
+// An odd-length ASCII head then 2- and 3-byte characters, so any byte limit
+// lands inside a character somewhere.
+std::string long_utf8_id() {
+    std::string id = "a";
+    for (int i = 0; i < 20000; ++i) {
+        id += "\xC3\xA9\xE2\x82\xAC";  // e-acute, euro sign
+    }
+    return id;
+}
+
+void expect_bounded(const adpp::Response& resp, adpp::Status::Code code, const std::string& prefix) {
+    EXPECT_EQ(resp.status().code(), code);
+    const std::string& msg = resp.status().message();
+    EXPECT_LE(msg.size(), 256U) << "echo is not bounded";
+    EXPECT_TRUE(is_valid_utf8(msg)) << "truncation split a character";
+    EXPECT_EQ(msg.rfind(prefix, 0), 0U) << msg.substr(0, 80);
+}
+
+}  // namespace
+
+TEST(DeviceHandlersTest, UnknownIdsAreEchoedBounded) {
+    DeviceMock rt;
+    const std::string id = long_utf8_id();
+    {
+        adpp::DescribeDeviceRequest req;
+        req.set_device_id(id);
+        adpp::Response resp;
+        sdk::handlers::handle_describe_device(req, resp, rt);
+        expect_bounded(resp, adpp::Status::CODE_NOT_FOUND, "unknown device_id: a");
+    }
+    {
+        adpp::ReadSignalsRequest req;
+        req.set_device_id(id);
+        adpp::Response resp;
+        sdk::handlers::handle_read_signals(req, resp, rt);
+        expect_bounded(resp, adpp::Status::CODE_NOT_FOUND, "unknown device_id: a");
+    }
+    {
+        adpp::ReadSignalsRequest req;
+        req.set_device_id("temp");
+        req.add_signal_ids(id);
+        adpp::Response resp;
+        sdk::handlers::handle_read_signals(req, resp, rt);
+        expect_bounded(resp, adpp::Status::CODE_NOT_FOUND, "unknown signal_id 'a");
+    }
+    {
+        adpp::CallRequest req;
+        req.set_device_id(id);
+        req.set_function_id(1);
+        adpp::Response resp;
+        sdk::handlers::handle_call(req, resp, rt);
+        expect_bounded(resp, adpp::Status::CODE_NOT_FOUND, "unknown device_id: a");
+    }
+    {
+        adpp::CallRequest req;
+        req.set_device_id("temp");
+        req.set_function_name(id);
+        adpp::Response resp;
+        sdk::handlers::handle_call(req, resp, rt);
+        expect_bounded(resp, adpp::Status::CODE_NOT_FOUND, "unknown function_name 'a");
+    }
+}
+
+TEST(DeviceHandlersTest, ShortIdsAreEchoedWhole) {
+    DeviceMock rt;
+    adpp::DescribeDeviceRequest req;
+    req.set_device_id("ghost");
+    adpp::Response resp;
+    sdk::handlers::handle_describe_device(req, resp, rt);
+    EXPECT_EQ(resp.status().message(), "unknown device_id: ghost");
 }

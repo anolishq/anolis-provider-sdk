@@ -42,6 +42,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `watchdog_status_age_ms`. Consumer follow-ups: anolishq/anolis#732,
   anolishq/anolis-workbench#809. (#62, anolishq/anolis-provider-bread#199)
 
+### Fixed
+
+- **A response over the 1 MiB frame cap no longer ends the provider.**
+  `run_loop` wrote nothing and returned 5 when a response would not fit in a
+  frame, so one well-formed request under the cap could kill a provider: a
+  `DescribeDevice` for an unknown `device_id` of about 1 MiB, whose
+  `NOT_FOUND` message quoted the id in full, or a handler result that was
+  simply large. Such a response is now replaced by `CODE_RESOURCE_EXHAUSTED`
+  for the same `request_id` (`CODE_INTERNAL` if it fails to serialize), as
+  the Python SDK does, and the loop keeps serving. The SDK's own error
+  messages quote at most 64 bytes of a request's `device_id`, `signal_id` or
+  `function_name`, cut on a UTF-8 character boundary and marked `...`. Exit 5
+  now means only that writing to standard output failed; exit 4 is no longer
+  returned, and `runtime.hpp` documents the codes against the framed-stdio
+  profile. (#50)
+
 ## [0.6.0] — 2026-11-04
 
 ### Added

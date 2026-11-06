@@ -15,7 +15,7 @@ namespace anolis::provider_sdk {
 namespace {
 
 // Fires the provider's shutdown hook on every exit from run_loop (clean EOF and
-// the parse/serialize/write-failure returns alike) — mirrors sim's
+// the read/parse/write-failure returns alike) — mirrors sim's
 // PhysicsShutdownGuard.
 class ShutdownGuard {
 public:
@@ -96,9 +96,25 @@ int run_loop(std::istream& input, std::ostream& output, ProviderRuntime& runtime
             handlers::handle_unimplemented(response);
         }
 
+        // A response that cannot be framed (over the cap, or not serializable) is
+        // replaced by a small error for the same request, and the loop keeps
+        // serving (framed-stdio v1 §2, §4; #50). The fallback carries only the
+        // request_id and a short status, so it always fits.
         std::string response_bytes;
-        if (!response.SerializeToString(&response_bytes)) {
-            return 4;
+        const bool serialized = response.SerializeToString(&response_bytes);
+        if (!serialized || response_bytes.size() > transport::kMaxFrameBytes) {
+            adpp::Response fallback;
+            fallback.set_request_id(request.request_id());
+            if (serialized) {
+                fallback.mutable_status()->set_code(adpp::Status::CODE_RESOURCE_EXHAUSTED);
+                fallback.mutable_status()->set_message("response of " + std::to_string(response_bytes.size()) +
+                                                       " bytes exceeds the " +
+                                                       std::to_string(transport::kMaxFrameBytes) + "-byte frame limit");
+            } else {
+                fallback.mutable_status()->set_code(adpp::Status::CODE_INTERNAL);
+                fallback.mutable_status()->set_message("response could not be serialized");
+            }
+            response_bytes = fallback.SerializeAsString();  // empty on failure: write_frame refuses it, exit 5
         }
         if (!transport::write_frame(output, reinterpret_cast<const uint8_t*>(response_bytes.data()),
                                     response_bytes.size(), io_err)) {

@@ -22,6 +22,22 @@ void set_status(adpp::Response& response, adpp::Status::Code code, const std::st
 
 void set_status_ok(adpp::Response& response) { set_status(response, adpp::Status::CODE_OK, "ok"); }
 
+// A request field quoted in an error message, cut to kMaxEchoBytes on a UTF-8
+// character boundary with `...` marking the cut, so an error reply stays small
+// however large the field is (#50). The Python SDK's limit is 64 characters.
+constexpr std::size_t kMaxEchoBytes = 64;
+
+std::string echo(const std::string& field) {
+    if (field.size() <= kMaxEchoBytes) {
+        return field;
+    }
+    std::size_t end = kMaxEchoBytes;
+    while (end > 0 && (static_cast<unsigned char>(field[end]) & 0xC0U) == 0x80U) {
+        --end;  // field[end] continues the character before it: cut before that character
+    }
+    return field.substr(0, end) + "...";
+}
+
 // §8.4 deadlines. A deadline is a google.protobuf.Timestamp, an absolute UTC
 // time, compared against the wall clock as the Python SDK does. A valid
 // Timestamp lies in 0001-01-01T00:00:00Z ..= 9999-12-31T23:59:59.999999999Z.
@@ -238,7 +254,7 @@ void handle_describe_device(const adpp::DescribeDeviceRequest& request, adpp::Re
         return;
     }
     if (!runtime.has_device(request.device_id())) {
-        set_status(response, adpp::Status::CODE_NOT_FOUND, "unknown device_id: " + request.device_id());
+        set_status(response, adpp::Status::CODE_NOT_FOUND, "unknown device_id: " + echo(request.device_id()));
         return;
     }
     auto* out = response.mutable_describe_device();
@@ -271,7 +287,7 @@ void handle_read_signals(const adpp::ReadSignalsRequest& request, adpp::Response
         return;
     }
     if (!runtime.has_device(request.device_id())) {
-        set_status(response, adpp::Status::CODE_NOT_FOUND, "unknown device_id: " + request.device_id());
+        set_status(response, adpp::Status::CODE_NOT_FOUND, "unknown device_id: " + echo(request.device_id()));
         return;
     }
 
@@ -290,7 +306,7 @@ void handle_read_signals(const adpp::ReadSignalsRequest& request, adpp::Response
         for (const auto& id : ids) {
             if (known.find(id) == known.end()) {
                 set_status(response, adpp::Status::CODE_NOT_FOUND,
-                           "unknown signal_id '" + id + "' for device '" + request.device_id() + "'");
+                           "unknown signal_id '" + echo(id) + "' for device '" + echo(request.device_id()) + "'");
                 return;
             }
         }
@@ -317,7 +333,7 @@ void handle_call(const adpp::CallRequest& request, adpp::Response& response, Pro
         return;
     }
     if (!runtime.has_device(request.device_id())) {
-        set_status(response, adpp::Status::CODE_NOT_FOUND, "unknown device_id: " + request.device_id());
+        set_status(response, adpp::Status::CODE_NOT_FOUND, "unknown device_id: " + echo(request.device_id()));
         return;
     }
     if (request.function_id() == 0 && request.function_name().empty()) {
@@ -330,9 +346,9 @@ void handle_call(const adpp::CallRequest& request, adpp::Response& response, Pro
     if (request.function_id() == 0) {
         const auto resolved = runtime.resolve_function_id(request.device_id(), request.function_name());
         if (!resolved.has_value()) {
-            set_status(
-                response, adpp::Status::CODE_NOT_FOUND,
-                "unknown function_name '" + request.function_name() + "' for device_id '" + request.device_id() + "'");
+            set_status(response, adpp::Status::CODE_NOT_FOUND,
+                       "unknown function_name '" + echo(request.function_name()) + "' for device_id '" +
+                           echo(request.device_id()) + "'");
             return;
         }
         resolved_function_id = *resolved;
