@@ -127,6 +127,14 @@ TEST(I2cClaimKey, AMissingNodeGetsItsLexicalForm) {
 TEST(I2cClaimKey, SchemePathsAreLeftAlone) {
     EXPECT_EQ(sdk::i2c::claim_key("mock://bench", 0x0A), "i2c:mock://bench:0x0a");
     EXPECT_EQ(sdk::i2c::claim_key("mock://bench//./x/", 0x0A), "i2c:mock://bench//./x/:0x0a");
+    // Any scheme, not only mock://.
+    EXPECT_EQ(sdk::i2c::claim_key("tcp://bridge//./x/", 0x0A), "i2c:tcp://bridge//./x/:0x0a");
+}
+
+TEST(I2cClaimKey, TheRootStaysTheRoot) {
+    // Stripping trailing separators must leave `/` itself.
+    EXPECT_EQ(sdk::i2c::claim_key("/", 0x63), "i2c:/:0x63");
+    EXPECT_EQ(sdk::i2c::claim_key("//", 0x63), "i2c:/:0x63");
 }
 
 #ifndef _WIN32

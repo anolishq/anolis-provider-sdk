@@ -40,9 +40,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `mock://` and other scheme paths are unchanged, and a path that resolves to
   a name containing whitespace is rejected. On Windows, which has no i2c-dev,
   only the lexical normalisation applies. A provider configured with a
-  symlink now publishes the target's path in its claim. The runtime compares
-  keys as before; a collision is seen only when each provider involved builds
-  its key with this release or later. (#47)
+  symlink now publishes the target's path in its claim. **Upgrade every
+  provider that shares a bus together:** the runtime compares keys as opaque
+  strings, so two providers that configure the same symlinked or
+  non-canonical path collide today because their strings match, and if only
+  one of them takes this release the keys differ and that collision is no
+  longer detected. Aliases are caught only once every provider on the bus is
+  on this release or later. (#47)
 
 ## [0.6.0] — 2026-11-04
 

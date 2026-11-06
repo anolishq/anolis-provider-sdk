@@ -23,11 +23,20 @@
 //   `/dev/i2c-9`. An alias of a missing node is then caught only if it
 //   normalises to the same string; a provider should claim after the bus is
 //   present. The same lexical fallback applies when resolving fails (for
-//   example a symlink loop or a directory the provider cannot search).
+//   example a symlink loop or a directory the provider cannot search). A
+//   relative path whose first component does not exist stays relative, so
+//   its key depends on the provider's working directory; configure absolute
+//   bus paths.
 // - On Windows, which has no i2c-dev, only the lexical normalisation applies.
 //
-// The runtime still compares keys as opaque strings, so a collision is seen
-// only when every provider involved builds its key with this version or later.
+// Upgrade every provider that shares a bus together. The runtime compares keys
+// as opaque strings, and SDK releases before this one put the path into the key
+// as configured. Two providers that configure the same symlinked or
+// non-canonical path (`/dev/i2c-sensors`, `/dev//i2c-1`) collide today because
+// their strings match; if only one of them moves to this release, it publishes
+// the resolved path, the keys differ, and the runtime no longer sees that
+// collision. Aliases are caught only once every provider on the bus builds its
+// key with this release or later.
 
 #include <string>
 #include <string_view>
