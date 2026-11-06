@@ -44,6 +44,27 @@ A function that declares results (`FunctionSpec.results`) returns them with
 `call_ok(results)`, and the response carries exactly those. A call that returns
 no results gets the constant `accepted = true`.
 
+The SDK handles a call's deadline (`CallRequest.deadline`, semantics §8.4) and
+advertises `supports_deadlines = "true"` in Hello. The deadline is an absolute
+UTC time, compared with the wall clock. After the SDK's own checks (device,
+function name, and the arguments of a declared function), a deadline that is
+not a valid timestamp gets `CODE_INVALID_ARGUMENT`, and one already reached
+gets `CODE_DEADLINE_EXCEEDED`; in both cases `call` does not run. A
+`function_id` the device does not declare is left to `call` to reject, so for
+one of those the deadline is reported first. The SDK makes no attempt to
+cancel a running `call` and does not pass it the deadline, so `call` cannot
+attempt one either: the best-effort cancel §8.4 asks for is not provided. If the deadline
+passes while `call` runs, the call completes, and the response is
+`CODE_DEADLINE_EXCEEDED` with `side_effects = possible` in the status details,
+without the call's results, because its effects may have happened. An error
+`call` returns is sent as it is, not replaced by `CODE_DEADLINE_EXCEEDED`, as
+in the Python SDK, although §8.4's text asks for `CODE_DEADLINE_EXCEEDED`
+whenever the deadline passes during execution. So keep `call` short and do not start long
+waits in it. The Python SDK behaves the same way, except that it answers an
+unknown function with `CODE_NOT_FOUND` before looking at the deadline. The SDK
+enforces deadlines even if a provider sets `supports_deadlines` to `"false"`
+through `hello_extra`.
+
 Inside `read` and `call`, each provider dispatches to a per-device-type
 adapter of its own. The SDK also offers an optional template for that table,
 `DeviceAdapter<HandleT>` in `device_adapter.hpp`, parameterised on the
@@ -51,7 +72,8 @@ provider's hardware session type.
 
 ### Advertise WaitReady
 
-The SDK's Hello response carries `transport` and `max_frame_bytes`. The
+The SDK's Hello response carries `transport`, `max_frame_bytes` and
+`supports_deadlines`. The
 [framed-stdio profile](https://github.com/anolishq/anolis-protocol/blob/main/docs/profiles/framed-stdio-v1.md)
 also requires `supports_wait_ready`, so add it through
 `ProviderMetadata::hello_extra`. The runtime sends WaitReady only when it is
