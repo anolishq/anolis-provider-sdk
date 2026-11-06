@@ -7,7 +7,7 @@
 // runtime rejects two devices that publish the same key, comparing exact strings
 // and parsing nothing, so it knows no transport. Two providers sharing a resource
 // must therefore spell its key identically: the key's format belongs to whoever
-// defines the resource, e.g. `i2c::claim_key` for an address on an I2C bus.
+// defines the resource, e.g. `i2c::claim_keys` for an address on an I2C bus.
 
 #include <string_view>
 

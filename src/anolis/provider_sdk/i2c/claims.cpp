@@ -5,7 +5,9 @@
 #include <cstdio>
 #include <filesystem>
 #include <stdexcept>
+#include <string>
 #include <system_error>
+#include <vector>
 
 namespace anolis::provider_sdk::i2c {
 
@@ -41,9 +43,7 @@ std::string canonical_bus_path(std::string_view bus_path) {
     return out;
 }
 
-}  // namespace
-
-std::string claim_key(std::string_view bus_path, unsigned int address) {
+void check_inputs(std::string_view bus_path, unsigned int address) {
     if (bus_path.empty() || has_whitespace(bus_path)) {
         throw std::invalid_argument("I2C claim key: bus path must be non-empty and contain no whitespace: '" +
                                     std::string(bus_path) + "'");
@@ -51,15 +51,34 @@ std::string claim_key(std::string_view bus_path, unsigned int address) {
     if (address > 0x7FU) {
         throw std::invalid_argument("I2C claim key: address " + std::to_string(address) + " is not a 7-bit address");
     }
+}
+
+std::string key_for(std::string_view path, unsigned int address) {
+    char hex[8];
+    std::snprintf(hex, sizeof(hex), "0x%02x", address);
+    return "i2c:" + std::string(path) + ":" + hex;
+}
+
+}  // namespace
+
+std::string claim_key(std::string_view bus_path, unsigned int address) {
+    check_inputs(bus_path, address);
+    return key_for(bus_path, address);
+}
+
+std::vector<std::string> claim_keys(std::string_view bus_path, unsigned int address) {
+    check_inputs(bus_path, address);
     const std::string path = canonical_bus_path(bus_path);
     if (has_whitespace(path)) {
         // A symlink can resolve to a name with a space, which would split the claim tag.
         throw std::invalid_argument("I2C claim key: bus path '" + std::string(bus_path) + "' resolves to '" + path +
                                     "', which contains whitespace");
     }
-    char hex[8];
-    std::snprintf(hex, sizeof(hex), "0x%02x", address);
-    return "i2c:" + path + ":" + hex;
+    std::vector<std::string> keys{key_for(bus_path, address)};
+    if (path != bus_path) {
+        keys.push_back(key_for(path, address));
+    }
+    return keys;
 }
 
 }  // namespace anolis::provider_sdk::i2c
