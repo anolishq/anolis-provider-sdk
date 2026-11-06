@@ -37,6 +37,8 @@ void handle_describe_device(const adpp::DescribeDeviceRequest& request, adpp::Re
 void handle_read_signals(const adpp::ReadSignalsRequest& request, adpp::Response& response, ProviderRuntime& runtime);
 
 // Invoke a device function by numeric id (preferred) or resolved symbolic name.
+// Owns the call policy: §8.3 argument validation and the §8.4 deadline (checked
+// before ProviderRuntime::call, and reported if it passes while the call runs).
 void handle_call(const adpp::CallRequest& request, adpp::Response& response, ProviderRuntime& runtime);
 
 // Report provider + per-device health derived from the readiness snapshot.
