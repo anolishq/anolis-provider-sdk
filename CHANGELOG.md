@@ -73,6 +73,32 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   profile: 0/2/3 as it defines them, plus 5 for a failed write to standard
   output, which the profile does not list. (#50)
 
+### Fixed
+
+- **I2C claims catch two paths to one adapter: new `i2c::claim_keys`.** The
+  key `i2c::claim_key` builds uses the configured `bus_path` as given, so a
+  udev symlink to `/dev/i2c-1`, `/dev//i2c-1` or `/dev/./i2c-1` each gave a
+  different key and the runtime's `anolis.claim` uniqueness check let two
+  providers drive the same address. `i2c::claim_keys(bus_path, address)`
+  returns the key as configured and, when it differs, the key for the path
+  resolved as realpath(3) would: symlinks, `.` and `..` segments and repeated
+  or trailing separators collapse onto the node when every component exists.
+  A provider adds each of them with `add_claim`. A missing component leaves
+  the rest of the path in lexically normal form, so an alias of a missing
+  node is caught only if it normalises to the same string, and nothing
+  reports that a key fell back. `mock://` and other scheme paths give one key,
+  unchanged, and a path that resolves to a name containing whitespace is
+  rejected. On Windows, which has no i2c-dev, only the lexical normalisation
+  applies. `i2c::claim_key` is unchanged and still returns the configured key
+  alone, so a provider that takes this release without moving to
+  `claim_keys` publishes what it did before. Because the configured key is
+  always published, every collision earlier releases catch is still caught in
+  a fleet mixing SDK versions. Aliases are caught when both providers use
+  `claim_keys`, or when an older provider's configured path is the other's
+  resolved path; an older provider on an alias and a newer one on another
+  spelling are still not caught. Providers pick this up by an SDK bump plus
+  the move to `claim_keys`. (#47)
+
 ## [0.6.0] — 2026-11-04
 
 ### Added

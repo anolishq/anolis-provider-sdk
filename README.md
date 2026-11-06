@@ -29,7 +29,7 @@ share, so a new provider is "implement the device seam, get the protocol for fre
 - **Host requirements and claims** (anolishq/anolis#318) — the `--check-host`
   envelope and its readiness keys (`host_check.hpp`, executable profile v1 §6),
   the `anolis.claim` device tag (`claims.hpp`), and, in the I2C module, the
-  canonical I2C claim key (`i2c/claims.hpp`) and reusable i2c-dev host checks
+  I2C claim keys (`i2c/claims.hpp`) and reusable i2c-dev host checks
   (`i2c/host_checks.hpp`).
 
 - **Contracts, not code, where code would couple** — the reserved device-health
