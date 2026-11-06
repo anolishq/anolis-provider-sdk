@@ -145,8 +145,14 @@ struct LifecycleHooks {
 
 // The generic ADPP serving loop. Reads length-prefixed Request frames from
 // `input`, dispatches through `runtime`, writes Response frames to `output`.
-// Returns the process exit code: 0 clean EOF, 2 read error, 3 parse error,
-// 4 serialize error, 5 write error. `hooks.on_shutdown()` fires on every exit.
+// Returns the process exit code. 0, 2 and 3 are framed-stdio v1 §4's: 0 clean
+// EOF, 2 a frame/read error (including a request over the cap), 3 an
+// unparseable request. 5 means a response could not be written to `output`,
+// which is a failure of the output stream, not a reaction to the input. A
+// response that would not fit in a frame, or fails to serialize, is not an
+// exit: it is answered with CODE_RESOURCE_EXHAUSTED or CODE_INTERNAL for the
+// same request_id and the loop goes on. (Exit 4, serialize error, is no longer
+// returned.) `hooks.on_shutdown()` fires on every exit.
 int run_loop(std::istream& input, std::ostream& output, ProviderRuntime& runtime, const LifecycleHooks& hooks = {});
 
 }  // namespace anolis::provider_sdk

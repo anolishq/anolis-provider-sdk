@@ -50,9 +50,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   that read `watchdog_armed` or `watchdog_tripped` as current must now check
   `watchdog_status_age_ms`. Consumer follow-ups: anolishq/anolis#732,
   anolishq/anolis-workbench#809. (#62, anolishq/anolis-provider-bread#199)
+- **`run_loop` no longer returns exit code 4.** It documented 4 for a response
+  that failed to serialize; that response is now answered with
+  `CODE_INTERNAL` and the loop goes on, so 4 has no remaining cause. A
+  provider that maps 4 to something of its own will not see it. 5 now means
+  only a failed write to standard output. (#50)
 
 ### Fixed
 
+- **A response over the 1 MiB frame cap no longer ends the provider.**
+  `run_loop` wrote nothing and returned 5 when a response would not fit in a
+  frame, so one well-formed request under the cap could kill a provider: a
+  `DescribeDevice` for an unknown `device_id` of about 1 MiB, whose
+  `NOT_FOUND` message quoted the id in full, or a handler result that was
+  simply large. Such a response is now replaced by `CODE_RESOURCE_EXHAUSTED`
+  for the same `request_id` (`CODE_INTERNAL` if it fails to serialize), as
+  the Python SDK does, and the loop keeps serving. The SDK's own error
+  messages quote at most 64 bytes of a request's `device_id`, `signal_id`,
+  `function_name` or undeclared argument name, cut on a UTF-8 character
+  boundary and marked `...`. A response of exactly 1 MiB is still sent as it
+  is. `runtime.hpp` documents the exit codes against the framed-stdio
+  profile: 0/2/3 as it defines them, plus 5 for a failed write to standard
+  output, which the profile does not list. (#50)
 - **I2C claims catch two paths to one adapter: new `i2c::claim_keys`.** The
   key `i2c::claim_key` builds uses the configured `bus_path` as given, so a
   udev symlink to `/dev/i2c-1`, `/dev//i2c-1` or `/dev/./i2c-1` each gave a

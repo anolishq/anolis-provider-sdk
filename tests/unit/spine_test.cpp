@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <sstream>
@@ -290,4 +291,162 @@ TEST(SpineTest, MalformedFrameReturnsParseError) {
     ASSERT_TRUE(sdk::transport::write_frame(in, reinterpret_cast<const uint8_t*>(garbage.data()), garbage.size(), err));
 
     EXPECT_EQ(sdk::run_loop(in, out, rt), 3);  // parse error
+}
+
+// #50: a response over the 1 MiB frame cap.
+
+namespace {
+
+std::string serialized(const adpp::Request& req) {
+    std::string bytes;
+    EXPECT_TRUE(req.SerializeToString(&bytes));
+    return bytes;
+}
+
+// Every response frame fits the cap and is not OK/UNSPECIFIED where expected.
+void expect_error_frame(const adpp::Response& r, uint64_t request_id) {
+    EXPECT_EQ(r.request_id(), request_id);
+    EXPECT_NE(r.status().code(), adpp::Status::CODE_OK);
+    EXPECT_NE(r.status().code(), adpp::Status::CODE_UNSPECIFIED);
+    EXPECT_LE(r.ByteSizeLong(), sdk::transport::kMaxFrameBytes);
+}
+
+// device_info() carries a label too large for any one frame, so a ListDevices
+// answer cannot fit however the handler phrases it.
+class HugeDeviceRuntime : public MockRuntime {
+public:
+    adpp::Device device_info(const std::string& id) const override {
+        adpp::Device d;
+        d.set_device_id(id);
+        d.set_label(std::string(sdk::transport::kMaxFrameBytes, 'L'));
+        return d;
+    }
+};
+
+}  // namespace
+
+TEST(SpineTest, SubCapRequestWithAnOverCapAnswerGetsAnErrorAndTheLoopContinues) {
+    // The issue's repro: DescribeDevice with an unknown device_id of 1048560
+    // bytes. The request is under the cap; the NOT_FOUND message echoing it
+    // was not, and the provider exited 5 without answering.
+    MockRuntime rt;
+    std::stringstream in(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream out(std::ios::in | std::ios::out | std::ios::binary);
+    push_request(in, hello_request());
+    adpp::Request describe;
+    describe.set_request_id(2);
+    describe.mutable_describe_device()->set_device_id(std::string(1048560, 'x'));
+    ASSERT_LT(serialized(describe).size(), sdk::transport::kMaxFrameBytes);
+    push_request(in, describe);
+    adpp::Request list;
+    list.set_request_id(3);
+    list.mutable_list_devices();
+    push_request(in, list);
+
+    EXPECT_EQ(sdk::run_loop(in, out, rt), 0);
+    const auto responses = drain_responses(out);
+    ASSERT_EQ(responses.size(), 3u);
+    expect_error_frame(responses[1], 2);
+    EXPECT_EQ(responses[1].status().code(), adpp::Status::CODE_NOT_FOUND) << responses[1].status().message().size();
+    EXPECT_EQ(responses[2].request_id(), 3u);
+    EXPECT_EQ(responses[2].status().code(), adpp::Status::CODE_OK);
+}
+
+TEST(SpineTest, AnOverCapResponseIsReplacedByResourceExhausted) {
+    // Whatever produces it (here a provider's own device_info), a response over
+    // the cap is answered with a small error for the same request_id.
+    HugeDeviceRuntime rt;
+    std::stringstream in(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream out(std::ios::in | std::ios::out | std::ios::binary);
+    push_request(in, hello_request());
+    adpp::Request list;
+    list.set_request_id(41);
+    list.mutable_list_devices();
+    push_request(in, list);
+    adpp::Request health;
+    health.set_request_id(42);
+    health.mutable_get_health();
+    push_request(in, health);
+
+    EXPECT_EQ(sdk::run_loop(in, out, rt), 0);
+    const auto responses = drain_responses(out);
+    ASSERT_EQ(responses.size(), 3u);
+    expect_error_frame(responses[1], 41);
+    EXPECT_EQ(responses[1].status().code(), adpp::Status::CODE_RESOURCE_EXHAUSTED);
+    EXPECT_FALSE(responses[1].has_list_devices());
+    EXPECT_EQ(responses[2].request_id(), 42u);
+    EXPECT_EQ(responses[2].status().code(), adpp::Status::CODE_OK);
+}
+
+namespace {
+
+// One device whose label length is chosen by the test, to size a ListDevices
+// response to the byte.
+class SizedDeviceRuntime : public MockRuntime {
+public:
+    std::size_t label_bytes = 0;
+    std::vector<std::string> list_device_ids() const override { return {"dev0"}; }
+    adpp::Device device_info(const std::string& id) const override {
+        adpp::Device d;
+        d.set_device_id(id);
+        d.set_label(std::string(label_bytes, 'L'));
+        return d;
+    }
+};
+
+// The serialized size of run_loop's answer to ListDevices (request_id 7).
+std::size_t list_devices_response_bytes(SizedDeviceRuntime& rt) {
+    adpp::Response r;
+    r.set_request_id(7);
+    sdk::handlers::handle_list_devices(adpp::ListDevicesRequest{}, r, rt);
+    return r.ByteSizeLong();
+}
+
+// Runs Hello + ListDevices(request_id 7) and returns the ListDevices answer.
+adpp::Response list_devices_through_run_loop(SizedDeviceRuntime& rt) {
+    std::stringstream in(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream out(std::ios::in | std::ios::out | std::ios::binary);
+    push_request(in, hello_request());
+    adpp::Request list;
+    list.set_request_id(7);
+    list.mutable_list_devices();
+    push_request(in, list);
+    EXPECT_EQ(sdk::run_loop(in, out, rt), 0);
+    const auto responses = drain_responses(out);
+    EXPECT_EQ(responses.size(), 2u);
+    return responses.empty() ? adpp::Response{} : responses.back();
+}
+
+}  // namespace
+
+TEST(SpineTest, AResponseOfExactlyTheCapIsSentUnchanged) {
+    // The cap is inclusive (write_frame accepts size == kMaxFrameBytes): a
+    // response of exactly 1048576 bytes is legal and goes out as it is; one
+    // byte more is replaced.
+    SizedDeviceRuntime rt;
+    rt.label_bytes = 1048000;
+    const std::size_t probe = list_devices_response_bytes(rt);
+    rt.label_bytes += sdk::transport::kMaxFrameBytes - probe;  // the varint prefixes stay 3 bytes at this size
+    ASSERT_EQ(list_devices_response_bytes(rt), sdk::transport::kMaxFrameBytes);
+
+    const adpp::Response at_cap = list_devices_through_run_loop(rt);
+    EXPECT_EQ(at_cap.request_id(), 7u);
+    EXPECT_EQ(at_cap.status().code(), adpp::Status::CODE_OK);
+    ASSERT_EQ(at_cap.list_devices().devices_size(), 1);
+    EXPECT_EQ(at_cap.list_devices().devices(0).label().size(), rt.label_bytes);
+
+    rt.label_bytes += 1;
+    ASSERT_EQ(list_devices_response_bytes(rt), sdk::transport::kMaxFrameBytes + 1);
+    const adpp::Response over = list_devices_through_run_loop(rt);
+    EXPECT_EQ(over.request_id(), 7u);
+    EXPECT_EQ(over.status().code(), adpp::Status::CODE_RESOURCE_EXHAUSTED);
+}
+
+TEST(SpineTest, AFailedWriteIsExitFive) {
+    // Exit 5 stays for a real output-stream failure.
+    MockRuntime rt;
+    std::stringstream in(std::ios::in | std::ios::out | std::ios::binary);
+    push_request(in, hello_request());
+    std::ostream broken(nullptr);  // no buffer: every write sets badbit
+    EXPECT_EQ(sdk::run_loop(in, broken, rt), 5);
 }

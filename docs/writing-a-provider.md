@@ -124,8 +124,13 @@ int main(int argc, char** argv) {
 }
 ```
 
-`run_loop` returns the process exit code: 0 when standard input closes, and
-2 to 5 for read, parse, serialize and write errors. An optional
+`run_loop` returns the process exit code: 0 when standard input closes, 2 for
+a framing or read error, 3 for a request that does not parse (the codes of the
+framed-stdio profile, §4), and 5 when a response cannot be written to standard
+output. A response too large for a frame (1 MiB) is not an exit: the SDK
+answers that request with `CODE_RESOURCE_EXHAUSTED` instead and keeps serving,
+and request fields quoted in its own error messages are cut to 64 bytes. An
+optional
 `LifecycleHooks` argument runs code after the handshake (`initialize`), after
 WaitReady and on shutdown.
 

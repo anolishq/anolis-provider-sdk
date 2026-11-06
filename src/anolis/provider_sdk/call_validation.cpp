@@ -6,6 +6,8 @@
 #include <sstream>
 #include <string>
 
+#include "anolis/provider_sdk/echo_internal.hpp"
+
 namespace anolis::provider_sdk {
 namespace {
 
@@ -131,7 +133,8 @@ std::optional<ArgError> validate_call_args(const adpp::FunctionSpec& spec, const
         }
     }
     if (!undeclared.empty()) {
-        return invalid(spec.name() + " takes no argument " + quoted(*undeclared.begin()));
+        // The name comes from the request, so its echo is bounded (#50).
+        return invalid(spec.name() + " takes no argument " + quoted(internal::echo(*undeclared.begin())));
     }
     // Rules 2 to 6, argument by argument in declared order.
     for (const auto& arg : spec.args()) {
