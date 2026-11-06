@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "anolis/provider_sdk/call_validation.hpp"
+#include "anolis/provider_sdk/echo_internal.hpp"
 #include "anolis/provider_sdk/transport.hpp"  // kMaxFrameBytes for the Hello metadata
 #include "anolis/provider_sdk/values.hpp"     // make_bool_val for the call `accepted` result
 
@@ -22,21 +23,7 @@ void set_status(adpp::Response& response, adpp::Status::Code code, const std::st
 
 void set_status_ok(adpp::Response& response) { set_status(response, adpp::Status::CODE_OK, "ok"); }
 
-// A request field quoted in an error message, cut to kMaxEchoBytes on a UTF-8
-// character boundary with `...` marking the cut, so an error reply stays small
-// however large the field is (#50). The Python SDK's limit is 64 characters.
-constexpr std::size_t kMaxEchoBytes = 64;
-
-std::string echo(const std::string& field) {
-    if (field.size() <= kMaxEchoBytes) {
-        return field;
-    }
-    std::size_t end = kMaxEchoBytes;
-    while (end > 0 && (static_cast<unsigned char>(field[end]) & 0xC0U) == 0x80U) {
-        --end;  // field[end] continues the character before it: cut before that character
-    }
-    return field.substr(0, end) + "...";
-}
+using internal::echo;  // request fields quoted in error messages are bounded (#50)
 
 // §8.4 deadlines. A deadline is a google.protobuf.Timestamp, an absolute UTC
 // time, compared against the wall clock as the Python SDK does. A valid

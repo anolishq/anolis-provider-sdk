@@ -865,6 +865,20 @@ TEST(DeviceHandlersTest, UnknownIdsAreEchoedBounded) {
     }
 }
 
+TEST(DeviceHandlersTest, AnUndeclaredArgumentNameIsEchoedBounded) {
+    // §8.3 names the first undeclared argument, which comes from the request.
+    DeclaringSpy rt;
+    adpp::CallRequest req;
+    req.set_device_id("temp");
+    req.set_function_id(1);
+    (*req.mutable_args())["n"].set_int64_value(1);
+    (*req.mutable_args())[std::string(1000000, 'n')].set_int64_value(2);
+    adpp::Response resp;
+    sdk::handlers::handle_call(req, resp, rt);
+    expect_bounded(resp, adpp::Status::CODE_INVALID_ARGUMENT, "f takes no argument 'nnn");
+    EXPECT_EQ(rt.calls, 0);
+}
+
 TEST(DeviceHandlersTest, ShortIdsAreEchoedWhole) {
     DeviceMock rt;
     adpp::DescribeDeviceRequest req;

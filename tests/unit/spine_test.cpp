@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <sstream>
@@ -375,6 +376,70 @@ TEST(SpineTest, AnOverCapResponseIsReplacedByResourceExhausted) {
     EXPECT_FALSE(responses[1].has_list_devices());
     EXPECT_EQ(responses[2].request_id(), 42u);
     EXPECT_EQ(responses[2].status().code(), adpp::Status::CODE_OK);
+}
+
+namespace {
+
+// One device whose label length is chosen by the test, to size a ListDevices
+// response to the byte.
+class SizedDeviceRuntime : public MockRuntime {
+public:
+    std::size_t label_bytes = 0;
+    std::vector<std::string> list_device_ids() const override { return {"dev0"}; }
+    adpp::Device device_info(const std::string& id) const override {
+        adpp::Device d;
+        d.set_device_id(id);
+        d.set_label(std::string(label_bytes, 'L'));
+        return d;
+    }
+};
+
+// The serialized size of run_loop's answer to ListDevices (request_id 7).
+std::size_t list_devices_response_bytes(SizedDeviceRuntime& rt) {
+    adpp::Response r;
+    r.set_request_id(7);
+    sdk::handlers::handle_list_devices(adpp::ListDevicesRequest{}, r, rt);
+    return r.ByteSizeLong();
+}
+
+// Runs Hello + ListDevices(request_id 7) and returns the ListDevices answer.
+adpp::Response list_devices_through_run_loop(SizedDeviceRuntime& rt) {
+    std::stringstream in(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream out(std::ios::in | std::ios::out | std::ios::binary);
+    push_request(in, hello_request());
+    adpp::Request list;
+    list.set_request_id(7);
+    list.mutable_list_devices();
+    push_request(in, list);
+    EXPECT_EQ(sdk::run_loop(in, out, rt), 0);
+    const auto responses = drain_responses(out);
+    EXPECT_EQ(responses.size(), 2u);
+    return responses.empty() ? adpp::Response{} : responses.back();
+}
+
+}  // namespace
+
+TEST(SpineTest, AResponseOfExactlyTheCapIsSentUnchanged) {
+    // The cap is inclusive (write_frame accepts size == kMaxFrameBytes): a
+    // response of exactly 1048576 bytes is legal and goes out as it is; one
+    // byte more is replaced.
+    SizedDeviceRuntime rt;
+    rt.label_bytes = 1048000;
+    const std::size_t probe = list_devices_response_bytes(rt);
+    rt.label_bytes += sdk::transport::kMaxFrameBytes - probe;  // the varint prefixes stay 3 bytes at this size
+    ASSERT_EQ(list_devices_response_bytes(rt), sdk::transport::kMaxFrameBytes);
+
+    const adpp::Response at_cap = list_devices_through_run_loop(rt);
+    EXPECT_EQ(at_cap.request_id(), 7u);
+    EXPECT_EQ(at_cap.status().code(), adpp::Status::CODE_OK);
+    ASSERT_EQ(at_cap.list_devices().devices_size(), 1);
+    EXPECT_EQ(at_cap.list_devices().devices(0).label().size(), rt.label_bytes);
+
+    rt.label_bytes += 1;
+    ASSERT_EQ(list_devices_response_bytes(rt), sdk::transport::kMaxFrameBytes + 1);
+    const adpp::Response over = list_devices_through_run_loop(rt);
+    EXPECT_EQ(over.request_id(), 7u);
+    EXPECT_EQ(over.status().code(), adpp::Status::CODE_RESOURCE_EXHAUSTED);
 }
 
 TEST(SpineTest, AFailedWriteIsExitFive) {

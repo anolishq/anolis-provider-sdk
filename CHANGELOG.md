@@ -46,6 +46,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   that read `watchdog_armed` or `watchdog_tripped` as current must now check
   `watchdog_status_age_ms`. Consumer follow-ups: anolishq/anolis#732,
   anolishq/anolis-workbench#809. (#62, anolishq/anolis-provider-bread#199)
+- **`run_loop` no longer returns exit code 4.** It documented 4 for a response
+  that failed to serialize; that response is now answered with
+  `CODE_INTERNAL` and the loop goes on, so 4 has no remaining cause. A
+  provider that maps 4 to something of its own will not see it. 5 now means
+  only a failed write to standard output. (#50)
 
 ### Fixed
 
@@ -57,11 +62,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   simply large. Such a response is now replaced by `CODE_RESOURCE_EXHAUSTED`
   for the same `request_id` (`CODE_INTERNAL` if it fails to serialize), as
   the Python SDK does, and the loop keeps serving. The SDK's own error
-  messages quote at most 64 bytes of a request's `device_id`, `signal_id` or
-  `function_name`, cut on a UTF-8 character boundary and marked `...`. Exit 5
-  now means only that writing to standard output failed; exit 4 is no longer
-  returned, and `runtime.hpp` documents the codes against the framed-stdio
-  profile. (#50)
+  messages quote at most 64 bytes of a request's `device_id`, `signal_id`,
+  `function_name` or undeclared argument name, cut on a UTF-8 character
+  boundary and marked `...`. A response of exactly 1 MiB is still sent as it
+  is. `runtime.hpp` documents the exit codes against the framed-stdio
+  profile: 0/2/3 as it defines them, plus 5 for a failed write to standard
+  output, which the profile does not list. (#50)
 
 ## [0.6.0] — 2026-11-04
 
