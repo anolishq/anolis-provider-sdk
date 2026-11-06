@@ -52,11 +52,12 @@ not a valid timestamp gets `CODE_INVALID_ARGUMENT`, and one already reached
 gets `CODE_DEADLINE_EXCEEDED`; in both cases `call` does not run. A
 `function_id` the device does not declare is left to `call` to reject, so for
 one of those the deadline is reported first. The SDK makes no attempt to
-cancel a running `call` and does not pass it the deadline. If the deadline
+cancel a running `call` and does not pass it the deadline, so `call` cannot
+attempt one either: the best-effort cancel §8.4 asks for is not provided. If the deadline
 passes while `call` runs, the call completes, and the response is
 `CODE_DEADLINE_EXCEEDED` with `side_effects = possible` in the status details,
 without the call's results, because its effects may have happened. An error
-`call` returns is sent as it is. So keep `call` short and do not start long
+`call` returns is sent as it is, not replaced by `CODE_DEADLINE_EXCEEDED`. So keep `call` short and do not start long
 waits in it. The Python SDK behaves the same way, except that it answers an
 unknown function with `CODE_NOT_FOUND` before looking at the deadline. The SDK
 enforces deadlines even if a provider sets `supports_deadlines` to `"false"`

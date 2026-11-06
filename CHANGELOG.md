@@ -17,12 +17,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   reached is `CODE_DEADLINE_EXCEEDED`, in both cases before
   `ProviderRuntime::call` runs. A `function_id` the device does not declare is
   still the provider's to reject, so for one of those the deadline is reported
-  first, where the Python SDK answers `CODE_NOT_FOUND`. The SDK makes no
-  attempt to cancel a running call, which is how it meets §8.4's best-effort
-  cancel: by documenting that there is none, as the Python SDK does. If the
-  deadline passes while a call runs, the response is `CODE_DEADLINE_EXCEEDED`
-  with `side_effects = possible` in the status details and no results. An
-  error the call returns is sent unchanged. Every
+  first, where the Python SDK answers `CODE_NOT_FOUND`. The SDK does not
+  cancel a running call, and `ProviderRuntime::call` is not given the
+  deadline, so a provider cannot attempt a cancel either; §8.4 asks for a
+  documented best-effort cancel, and this release makes none (nor does the
+  Python SDK). If the deadline passes while a call runs, the response is
+  `CODE_DEADLINE_EXCEEDED` with `side_effects = possible` in the status
+  details and no results. An error the call returns is sent unchanged rather
+  than as `CODE_DEADLINE_EXCEEDED`, as in the Python SDK; §8.4 does not say
+  which wins. Every
   provider on this release advertises deadline support with no code change; a
   call without a deadline behaves as before. The reference provider's
   conformance lane now runs the two §8.4 tests and allows no skips. (#71)
