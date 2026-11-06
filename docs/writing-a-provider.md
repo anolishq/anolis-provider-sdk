@@ -57,7 +57,9 @@ attempt one either: the best-effort cancel §8.4 asks for is not provided. If th
 passes while `call` runs, the call completes, and the response is
 `CODE_DEADLINE_EXCEEDED` with `side_effects = possible` in the status details,
 without the call's results, because its effects may have happened. An error
-`call` returns is sent as it is, not replaced by `CODE_DEADLINE_EXCEEDED`. So keep `call` short and do not start long
+`call` returns is sent as it is, not replaced by `CODE_DEADLINE_EXCEEDED`, as
+in the Python SDK, although §8.4's text asks for `CODE_DEADLINE_EXCEEDED`
+whenever the deadline passes during execution. So keep `call` short and do not start long
 waits in it. The Python SDK behaves the same way, except that it answers an
 unknown function with `CODE_NOT_FOUND` before looking at the deadline. The SDK
 enforces deadlines even if a provider sets `supports_deadlines` to `"false"`
