@@ -400,6 +400,92 @@ TEST(DeviceHandlersTest, DeadlinePassingDuringTheCallIsReported) {
     EXPECT_FALSE(resp.has_call()) << "a call that missed its deadline must not also report results";
 }
 
+namespace {
+
+// Function 1 "f" declares one required int64 argument "n".
+struct DeclaringSpy : CallSpy {
+    adpp::CapabilitySet capabilities(const std::string&) const override {
+        adpp::CapabilitySet caps;
+        auto* f = caps.add_functions();
+        f->set_function_id(1);
+        f->set_name("f");
+        auto* a = f->add_args();
+        a->set_name("n");
+        a->set_type(adpp::VALUE_TYPE_INT64);
+        a->set_required(true);
+        return caps;
+    }
+};
+
+// Counts the call, then fails it.
+struct FailingSpy : CallSpy {
+    sdk::AdapterCallResult call(const std::string& device_id, uint32_t function_id,
+                                const sdk::ValueMap& args) override {
+        CallSpy::call(device_id, function_id, args);
+        return sdk::call_unavailable("bus down");
+    }
+};
+
+}  // namespace
+
+TEST(DeviceHandlersTest, ArgumentErrorsComeBeforeTheDeadline) {
+    // The SDK's §8.3 checks run first, as in the Python SDK.
+    DeclaringSpy rt;
+    adpp::Response resp;  // required "n" missing
+    sdk::handlers::handle_call(
+        call_with_deadline(timestamp_at(std::chrono::system_clock::now() - std::chrono::hours(1))), resp, rt);
+    EXPECT_EQ(resp.status().code(), adpp::Status::CODE_INVALID_ARGUMENT) << resp.status().message();
+    EXPECT_EQ(rt.calls, 0);
+}
+
+TEST(DeviceHandlersTest, AnUndeclaredFunctionIdMeetsTheDeadlineCheckFirst) {
+    // The SDK leaves an undeclared function_id to the provider (§8.3 note in
+    // handle_call), so it cannot answer NOT_FOUND before the deadline check as
+    // the Python SDK does: an expired or malformed deadline is reported, and
+    // the provider is still not called.
+    CallSpy rt;
+    auto expired = call_with_deadline(timestamp_at(std::chrono::system_clock::now() - std::chrono::hours(1)));
+    expired.set_function_id(99);
+    adpp::Response resp;
+    sdk::handlers::handle_call(expired, resp, rt);
+    EXPECT_EQ(resp.status().code(), adpp::Status::CODE_DEADLINE_EXCEEDED);
+
+    google::protobuf::Timestamp bad;
+    bad.set_nanos(-1);
+    auto malformed = call_with_deadline(bad);
+    malformed.set_function_id(99);
+    adpp::Response resp2;
+    sdk::handlers::handle_call(malformed, resp2, rt);
+    EXPECT_EQ(resp2.status().code(), adpp::Status::CODE_INVALID_ARGUMENT);
+    EXPECT_EQ(rt.calls, 0);
+}
+
+TEST(DeviceHandlersTest, TheLowestValidTimestampIsExpiredNotMalformed) {
+    CallSpy rt;
+    google::protobuf::Timestamp first;  // 0001-01-01T00:00:00Z
+    first.set_seconds(-62135596800);
+    adpp::Response resp;
+    sdk::handlers::handle_call(call_with_deadline(first), resp, rt);
+    EXPECT_EQ(resp.status().code(), adpp::Status::CODE_DEADLINE_EXCEEDED);
+    EXPECT_EQ(rt.calls, 0);
+}
+
+TEST(DeviceHandlersTest, AFailedCallPastItsDeadlineKeepsItsOwnError) {
+    FailingSpy rt;
+    const auto deadline = std::chrono::system_clock::now() + std::chrono::milliseconds(500);
+    rt.during = [deadline] {
+        while (std::chrono::system_clock::now() <= deadline + std::chrono::milliseconds(5)) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+    };
+    adpp::Response resp;
+    sdk::handlers::handle_call(call_with_deadline(timestamp_at(deadline)), resp, rt);
+    EXPECT_EQ(rt.calls, 1);
+    EXPECT_EQ(resp.status().code(), adpp::Status::CODE_UNAVAILABLE);
+    EXPECT_EQ(resp.status().message(), "bus down");
+    EXPECT_FALSE(resp.status().details().contains("side_effects"));
+}
+
 TEST(DeviceHandlersTest, LiveDeviceNotInStartupReportStillGetsHealth) {
     // Regression (caught by sim conformance): a live device absent from the
     // startup report — e.g. a synthetic control channel like sim's chaos_control —

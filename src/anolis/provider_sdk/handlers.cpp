@@ -353,9 +353,12 @@ void handle_call(const adpp::CallRequest& request, adpp::Response& response, Pro
         break;
     }
 
-    // §8.4, once the request is otherwise valid (the Python SDK's order): a
-    // malformed deadline is INVALID_ARGUMENT, and one already reached is
-    // DEADLINE_EXCEEDED without calling the provider.
+    // §8.4, after the checks above (device, function name, and the §8.3
+    // arguments of a declared function): a malformed deadline is
+    // INVALID_ARGUMENT, and one already reached is DEADLINE_EXCEEDED, without
+    // calling the provider. An undeclared function_id is the provider's to
+    // reject, so here the deadline is reported first; the Python SDK, which
+    // knows every function, answers NOT_FOUND instead.
     const bool has_deadline = request.has_deadline();
     if (has_deadline) {
         if (!is_valid_timestamp(request.deadline())) {

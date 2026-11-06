@@ -46,15 +46,21 @@ no results gets the constant `accepted = true`.
 
 The SDK handles a call's deadline (`CallRequest.deadline`, semantics §8.4) and
 advertises `supports_deadlines = "true"` in Hello. The deadline is an absolute
-UTC time, compared with the wall clock. After the arguments are checked, a
-deadline that is not a valid timestamp gets `CODE_INVALID_ARGUMENT`, and one
-already reached gets `CODE_DEADLINE_EXCEEDED`; in both cases `call` does not
-run. The SDK does not interrupt `call` and does not pass it the deadline. If
-the deadline passes while `call` runs, the call completes, and the response is
+UTC time, compared with the wall clock. After the SDK's own checks (device,
+function name, and the arguments of a declared function), a deadline that is
+not a valid timestamp gets `CODE_INVALID_ARGUMENT`, and one already reached
+gets `CODE_DEADLINE_EXCEEDED`; in both cases `call` does not run. A
+`function_id` the device does not declare is left to `call` to reject, so for
+one of those the deadline is reported first. The SDK makes no attempt to
+cancel a running `call` and does not pass it the deadline. If the deadline
+passes while `call` runs, the call completes, and the response is
 `CODE_DEADLINE_EXCEEDED` with `side_effects = possible` in the status details,
 without the call's results, because its effects may have happened. An error
 `call` returns is sent as it is. So keep `call` short and do not start long
-waits in it. This is the Python SDK's behaviour.
+waits in it. The Python SDK behaves the same way, except that it answers an
+unknown function with `CODE_NOT_FOUND` before looking at the deadline. The SDK
+enforces deadlines even if a provider sets `supports_deadlines` to `"false"`
+through `hello_extra`.
 
 Inside `read` and `call`, each provider dispatches to a per-device-type
 adapter of its own. The SDK also offers an optional template for that table,
