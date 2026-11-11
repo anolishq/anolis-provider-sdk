@@ -51,7 +51,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   changes, but the meaning of the watchdog keys on the wire changes: consumers
   that read `watchdog_armed` or `watchdog_tripped` as current must now check
   `watchdog_status_age_ms`. Consumer follow-ups: anolishq/anolis#732,
-  anolishq/anolis-workbench#809. (#62, anolishq/anolis-provider-bread#199)
+  anolishq/anolis-workbench#809. A provider that emits the `watchdog_*` keys
+  must now read the status on its own I/O path, cache it, and add
+  `watchdog_status_age_ms` (anolishq/anolis-provider-bread#199). (#62)
 - **`run_loop` no longer returns exit code 4.** It documented 4 for a response
   that failed to serialize; that response is now answered with
   `CODE_INTERNAL` and the loop goes on, so 4 has no remaining cause. A
