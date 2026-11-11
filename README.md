@@ -7,7 +7,7 @@ Shared C++ SDK for [Anolis Device Provider Protocol](https://github.com/anolishq
 [`anolis-provider-bread`](https://github.com/anolishq/anolis-provider-bread) —
 share, so a new provider is "implement the device seam, get the protocol for free."
 
-> **Status: v0.6.0 — the spine and device-model framework are lifted and
+> **Status: v0.7.0 — the spine and device-model framework are lifted and
 > consumed by all three reference providers** (each pins its own SDK release
 > tarball; the SDK is the fleet's single declarant of the `anolis-protocol`
 > build pin, v1.10.0; each provider's CI pins its own `anolis-protocol[conformance]`
