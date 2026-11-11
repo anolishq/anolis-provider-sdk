@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-11-10
+
 ### Added
 
 - **Call deadlines** (semantics §8.4). Hello advertises
@@ -49,7 +51,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   changes, but the meaning of the watchdog keys on the wire changes: consumers
   that read `watchdog_armed` or `watchdog_tripped` as current must now check
   `watchdog_status_age_ms`. Consumer follow-ups: anolishq/anolis#732,
-  anolishq/anolis-workbench#809. (#62, anolishq/anolis-provider-bread#199)
+  anolishq/anolis-workbench#809. A provider that emits the `watchdog_*` keys
+  must now read the status on its own I/O path, cache it, and add
+  `watchdog_status_age_ms` (anolishq/anolis-provider-bread#199). (#62)
 - **`run_loop` no longer returns exit code 4.** It documented 4 for a response
   that failed to serialize; that response is now answered with
   `CODE_INTERNAL` and the loop goes on, so 4 has no remaining cause. A
@@ -347,7 +351,8 @@ not a placeholder API.
   triplets, `tsan.supp` / `valgrind.supp`, Renovate, `AGENTS.md`.
 - A proto smoke test proving the re-export links and round-trips a message.
 
-[Unreleased]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/anolishq/anolis-provider-sdk/compare/v0.3.1...v0.4.0
