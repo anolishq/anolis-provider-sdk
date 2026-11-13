@@ -1,3 +1,5 @@
 # version-locations.txt for anolis-provider-sdk
 CMakeLists.txt:project\(.* VERSION ([0-9]+\.[0-9]+\.[0-9]+)
 vcpkg.json:"version": "([0-9]+\.[0-9]+\.[0-9]+)"
+
+README.md:\*\*Status: v([0-9]+\.[0-9]+\.[0-9]+)
