@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- `docs/metrics.md`: the transport I/O counter contract no longer describes
+  particular providers. Each provider documents its own failure classes and
+  counting unit in its repository. The removed bread example was wrong: bread
+  counts an intact CRUMBS reply it cannot use as `io_ok` plus `io_rejected`,
+  not `io_failed` (anolishq/anolis-provider-bread#240).
+
 ## [0.7.0] — 2026-11-10
 
 ### Added
