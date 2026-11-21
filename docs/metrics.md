@@ -37,28 +37,29 @@ Contract:
   rate hidden for weeks behind host retries, feastorg/Slice_DCMT#3.)
 - **Transport-level scope.** These counters measure whether the transport
   operation succeeded, judged by everything the provider's transport layer can
-  see. Where framing/decode is part of the transport (bread: a CRUMBS frame
-  that fails CRC or decode is a transport failure), garbage lands in
-  `io_failed`; where the transport sees only electrical success (ezo: a raw
-  I2C transaction), a garbage or not-ready payload counts in `io_ok` and the
+  see. Where the transport checks framing or integrity itself, a frame that
+  fails those checks lands in `io_failed`; where the transport sees only
+  electrical success, a garbage or not-ready payload counts in `io_ok` and the
   failure surfaces in protocol-level counters (see below). Each provider
-  should document which failure classes its transport layer can see.
+  documents, in its own repository, which failure classes its transport layer
+  can see.
 - **Operations that never reach the transport are not I/O.** Validation
   failures, not-open errors, and queue timeouts observed above the transport
   are excluded.
 - **Granularity is provider-defined and magnitudes are NOT comparable across
-  providers.** bread counts logical session operations (one `query_read` = 1);
-  ezo counts raw I2C transactions (one sample = several). The shared contract
-  is the key vocabulary and the properties above, never the magnitudes.
+  providers.** One provider may count a request-and-reply exchange as one
+  operation, another each bus transaction within it. Each provider documents
+  its unit alongside its failure classes. The shared contract is the key
+  vocabulary and the properties above, never the magnitudes.
 - Counters are cumulative for the provider process lifetime, monotonic, and
   reset on process restart.
 
 ### Protocol-level counters
 
 Where a provider distinguishes transport success from payload validity, the
-protocol-level outcome belongs in separate keys (e.g. ezo's
-`sample_success_count` / `sample_failure_count` / `call_success_count` /
-`call_failure_count`). Do not fold protocol failures into `io_failed`.
+protocol-level outcome belongs in separate, provider-specific keys, such as
+counts of successful and failed samples. Do not fold protocol failures into
+`io_failed`.
 
 ### Command-watchdog state
 
